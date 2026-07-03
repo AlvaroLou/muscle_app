@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "Workout Planner",
+    "slug": "workout-planner",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "scheme": "workoutplanner",
+    "icon": "./assets/halteres.png",
+    "splash": {
+      "image": "./assets/halteres.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#121212"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "android": {
+      "package": "com.workoutplanner.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/halteres.png",
+        "backgroundColor": "#121212"
+      }
+    },
+    "ios": {
+      "supportsTablet": true
+    }
+  }
+}
