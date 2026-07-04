@@ -21,5 +21,5 @@ export type TabsParamList = {
 export type RootStackParamList = {
   Tabs: NavigatorScreenParams<TabsParamList>;
   Create: { workoutId?: string; mode?: 'simple' | 'grouped' } | undefined;
-  ActiveWorkout: { workoutId: string };
+  ActiveWorkout: { workoutId: string; groupId?: string };
 };

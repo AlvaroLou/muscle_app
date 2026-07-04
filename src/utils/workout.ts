@@ -52,6 +52,41 @@ export function nextWorkoutIndex(
   return (lastIndex + 1) % workouts.length;
 }
 
+/** Treino com seções: mais de um grupo ou algum grupo nomeado. */
+export const isGrouped = (workout: Workout): boolean =>
+  workout.groups.length > 1 || workout.groups.some((g) => g.name.trim().length > 0);
+
+/**
+ * Índice do próximo grupo a treinar dentro de um treino (rotação Perna→Peito→
+ * Perna). Avança 1 a partir do último grupo concluído daquele treino.
+ * `sessions` deve estar ordenado do mais recente para o mais antigo.
+ */
+export function nextGroupIndex(workout: Workout, sessions: WorkoutSession[]): number {
+  if (workout.groups.length <= 1) return 0;
+  const last = sessions.find(
+    (s) => s.workoutId === workout.id && s.groupId != null,
+  );
+  if (!last) return 0;
+  const idx = workout.groups.findIndex((g) => g.id === last.groupId);
+  if (idx < 0) return 0;
+  return (idx + 1) % workout.groups.length;
+}
+
+/**
+ * Parâmetros para iniciar um treino "seguindo a semana": num treino com grupos,
+ * começa pelo próximo grupo da rotação; num treino simples, o treino inteiro.
+ */
+export function startParamsFor(
+  workout: Workout,
+  sessions: WorkoutSession[],
+): { workoutId: string; groupId?: string } {
+  if (isGrouped(workout)) {
+    const gi = nextGroupIndex(workout, sessions);
+    return { workoutId: workout.id, groupId: workout.groups[gi]?.id };
+  }
+  return { workoutId: workout.id };
+}
+
 /** Estimativa de duração (min) a partir do total de séries. */
 export function estimatedDurationMin(workout: Workout): number {
   const totalSets = allExercises(workout).reduce((sum, e) => sum + e.sets, 0);
@@ -66,6 +101,7 @@ function toEditExercise(e: Exercise): EditExercise {
     sets: String(e.sets),
     reps: String(e.reps),
     weight: e.weight > 0 ? String(e.weight) : '',
+    rest: e.rest > 0 ? String(e.rest) : '',
   };
 }
 
@@ -85,6 +121,7 @@ function fromEditExercises(list: EditExercise[]): ExerciseInput[] {
       sets: toInt(e.sets),
       reps: toInt(e.reps),
       weight: toNumber(e.weight),
+      rest: toInt(e.rest),
     }));
 }
 

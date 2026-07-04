@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 
-import { Workout } from '@/types';
+import { ActiveSession, Workout } from '@/types';
 import { useStopwatch } from './useStopwatch';
 
 /** Pausa padrão entre séries (segundos), ajustável durante o treino. */
@@ -12,13 +12,26 @@ export interface SessionSet {
   completed: boolean;
 }
 
+/** Chave estável de uma série, usada para persistir/retomar. */
+export const setKey = (exerciseId: string, setIndex: number) =>
+  `${exerciseId}:${setIndex}`;
+
+/** Tempo decorrido reconstruído de um snapshot (continua contando em 2º plano). */
+function elapsedFrom(initial?: ActiveSession): number {
+  if (!initial) return 0;
+  const extra =
+    initial.running && initial.lastResumeAt ? Date.now() - initial.lastResumeAt : 0;
+  return initial.accumulatedMs + extra;
+}
+
 /**
  * Orquestra a execução de um treino: duração total (cronômetro), controle de
  * séries concluídas, progresso e navegação entre exercícios. O timer de pausa
- * em si vive no RestTimer/useCountdown.
+ * em si vive no RestTimer/useCountdown. Se `initial` for passado, retoma o
+ * treino de onde parou.
  */
-export function useWorkoutSession(workout: Workout) {
-  const stopwatch = useStopwatch(true);
+export function useWorkoutSession(workout: Workout, initial?: ActiveSession) {
+  const stopwatch = useStopwatch(initial ? initial.running : true, elapsedFrom(initial));
 
   // Sequência achatada de exercícios, cada um com o nome do seu grupo.
   const items = useMemo(
@@ -29,16 +42,19 @@ export function useWorkoutSession(workout: Workout) {
     [workout],
   );
 
-  const [sets, setSets] = useState<SessionSet[]>(() =>
-    items.flatMap(({ exercise }) =>
+  const [sets, setSets] = useState<SessionSet[]>(() => {
+    const done = new Set(initial?.completedSetKeys ?? []);
+    return items.flatMap(({ exercise }) =>
       Array.from({ length: exercise.sets }, (_, setIndex) => ({
         exerciseId: exercise.id,
         setIndex,
-        completed: false,
+        completed: done.has(setKey(exercise.id, setIndex)),
       })),
-    ),
+    );
+  });
+  const [currentExerciseIndex, setCurrentExerciseIndex] = useState(
+    initial?.currentExerciseIndex ?? 0,
   );
-  const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
   const [finished, setFinished] = useState(false);
 
   const totalSets = sets.length;
@@ -84,12 +100,18 @@ export function useWorkoutSession(workout: Workout) {
     setFinished(true);
   }, [stopwatch]);
 
+  const completedSetKeys = useMemo(
+    () => sets.filter((s) => s.completed).map((s) => setKey(s.exerciseId, s.setIndex)),
+    [sets],
+  );
+
   return {
     elapsedMs: stopwatch.elapsedMs,
     running: stopwatch.running,
     pause: stopwatch.pause,
     resume: stopwatch.start,
     sets,
+    completedSetKeys,
     totalSets,
     completedSets,
     progress,

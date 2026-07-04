@@ -7,14 +7,24 @@ import React, {
   useState,
 } from 'react';
 
+import { activeSessionRepository } from '@/repositories/activeSessionRepository';
 import { sessionRepository } from '@/repositories/sessionRepository';
 import { workoutRepository } from '@/repositories/workoutRepository';
-import { ExerciseGroup, Workout, WorkoutInput, WorkoutSession } from '@/types';
+import { ActiveSession, ExerciseGroup, Workout, WorkoutInput, WorkoutSession } from '@/types';
 import { createId } from '@/utils/id';
 import { normalizeWorkout } from '@/utils/workout';
 
 /** Dados de uma sessão concluída, sem os campos gerados (id/completedAt). */
 export type SessionInput = Omit<WorkoutSession, 'id' | 'completedAt'>;
+
+/** Um treino em andamento expira após 3h sem atualização. */
+export const ACTIVE_SESSION_EXPIRY_MS = 3 * 60 * 60 * 1000;
+
+/** Retorna a sessão se ainda válida (não expirada); senão null. */
+function freshOrNull(s: ActiveSession | null): ActiveSession | null {
+  if (!s) return null;
+  return Date.now() - s.updatedAt <= ACTIVE_SESSION_EXPIRY_MS ? s : null;
+}
 
 /**
  * Store global de treinos: expõe o CRUD, centraliza o estado e persiste
@@ -25,6 +35,8 @@ interface WorkoutStoreValue {
   workouts: Workout[];
   /** Histórico de sessões concluídas, do mais recente para o mais antigo. */
   sessions: WorkoutSession[];
+  /** Treino em andamento (ou null). Já filtrado por expiração. */
+  activeSession: ActiveSession | null;
   loading: boolean;
   getWorkout: (id: string) => Workout | undefined;
   createWorkout: (input: WorkoutInput) => Workout;
@@ -32,6 +44,12 @@ interface WorkoutStoreValue {
   deleteWorkout: (id: string) => void;
   /** Registra uma sessão concluída no histórico. */
   logSession: (input: SessionInput) => void;
+  /** Limpa todo o histórico de sessões (recentes). */
+  clearSessions: () => void;
+  /** Cria/atualiza o treino em andamento (persiste). */
+  saveActiveSession: (session: ActiveSession) => void;
+  /** Encerra o treino em andamento. */
+  clearActiveSession: () => void;
 }
 
 const WorkoutContext = createContext<WorkoutStoreValue | undefined>(undefined);
@@ -53,24 +71,44 @@ function withIds(input: WorkoutInput): ExerciseGroup[] {
 export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [sessions, setSessions] = useState<WorkoutSession[]>([]);
+  const [activeSession, setActiveSession] = useState<ActiveSession | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Carrega treinos e histórico salvos na montagem. Sem seed: começa vazio.
+  // Carrega treinos, histórico e treino em andamento na montagem.
   useEffect(() => {
     let active = true;
     (async () => {
-      const [storedWorkouts, storedSessions] = await Promise.all([
+      const [storedWorkouts, storedSessions, storedActive] = await Promise.all([
         workoutRepository.getAll(),
         sessionRepository.getAll(),
+        activeSessionRepository.get(),
       ]);
       if (!active) return;
       setWorkouts(storedWorkouts.map(normalizeWorkout));
       setSessions(sortRecent(storedSessions));
+      const fresh = freshOrNull(storedActive);
+      if (!fresh && storedActive) void activeSessionRepository.clear();
+      setActiveSession(fresh);
       setLoading(false);
     })();
     return () => {
       active = false;
     };
+  }, []);
+
+  const clearSessions = useCallback(() => {
+    setSessions([]);
+    void sessionRepository.clear();
+  }, []);
+
+  const saveActiveSession = useCallback((session: ActiveSession) => {
+    setActiveSession(session);
+    void activeSessionRepository.save(session);
+  }, []);
+
+  const clearActiveSession = useCallback(() => {
+    setActiveSession(null);
+    void activeSessionRepository.clear();
   }, []);
 
   /** Aplica transformação imutável, persiste e atualiza o estado. */
@@ -145,14 +183,31 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     () => ({
       workouts,
       sessions,
+      activeSession,
       loading,
       getWorkout,
       createWorkout,
       updateWorkout,
       deleteWorkout,
       logSession,
+      clearSessions,
+      saveActiveSession,
+      clearActiveSession,
     }),
-    [workouts, sessions, loading, getWorkout, createWorkout, updateWorkout, deleteWorkout, logSession],
+    [
+      workouts,
+      sessions,
+      activeSession,
+      loading,
+      getWorkout,
+      createWorkout,
+      updateWorkout,
+      deleteWorkout,
+      logSession,
+      clearSessions,
+      saveActiveSession,
+      clearActiveSession,
+    ],
   );
 
   return <WorkoutContext.Provider value={value}>{children}</WorkoutContext.Provider>;

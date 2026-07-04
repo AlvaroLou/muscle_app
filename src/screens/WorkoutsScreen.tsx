@@ -16,6 +16,7 @@ import {
   badgeFor,
   estimatedDurationMin,
   groupTags,
+  startParamsFor,
   workoutLetter,
 } from '@/utils/workout';
 import { RootStackParamList, WorkoutsStackParamList } from '@/navigation/types';
@@ -27,7 +28,7 @@ type Nav = CompositeNavigationProp<
 
 export function WorkoutsScreen() {
   const navigation = useNavigation<Nav>();
-  const { workouts, deleteWorkout } = useWorkouts();
+  const { workouts, sessions, deleteWorkout } = useWorkouts();
 
   const [typeSheet, setTypeSheet] = useState(false);
 
@@ -49,6 +50,12 @@ export function WorkoutsScreen() {
     setMenuWorkout(null);
     // reseta a confirmação depois que o sheet some.
     setTimeout(() => setConfirmDelete(false), 200);
+  };
+
+  const startFromMenu = () => {
+    const workout = menuWorkout;
+    closeMenu();
+    if (workout) navigation.navigate('ActiveWorkout', startParamsFor(workout, sessions));
   };
 
   const editFromMenu = () => {
@@ -224,6 +231,20 @@ export function WorkoutsScreen() {
           </>
         ) : (
           <>
+            <Pressable
+              style={({ pressed }) => [styles.option, pressed && styles.optionPressed]}
+              onPress={startFromMenu}
+            >
+              <View style={styles.optionIcon}>
+                <Icon name="timer" size={22} color={colors.accent} />
+              </View>
+              <View style={styles.optionInfo}>
+                <Text style={styles.optionTitle}>Iniciar treino</Text>
+                <Text style={styles.optionDesc}>Segue a rotação da semana</Text>
+              </View>
+              <Icon name="chevron-right" size={20} color={colors.textMuted} />
+            </Pressable>
+
             <Pressable
               style={({ pressed }) => [styles.option, pressed && styles.optionPressed]}
               onPress={editFromMenu}

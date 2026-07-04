@@ -11,6 +11,8 @@ export interface Exercise {
   reps: number;
   /** Carga em kg. 0 = peso corporal. */
   weight: number;
+  /** Descanso entre séries, em segundos. 0 = usar o padrão global. */
+  rest: number;
 }
 
 /** Um grupo/seção de exercícios dentro do treino (ex.: "Perna"). */
@@ -38,12 +40,34 @@ export interface WorkoutSession {
   id: string;
   workoutId: string;
   workoutName: string;
+  /** Grupo treinado, quando a sessão foi de um grupo específico. */
+  groupId?: string;
   /** Índice do treino na rotação no momento da conclusão (0=A, 1=B...). */
   order: number;
   completedAt: number;
   durationMs: number;
   completedSets: number;
   totalSets: number;
+}
+
+/**
+ * Treino em andamento (persistido) — permite sair e retomar. O tempo decorrido
+ * é reconstruído por timestamps: `accumulatedMs` é o tempo já contado até a
+ * última pausa; se `running`, soma-se (agora − `lastResumeAt`).
+ */
+export interface ActiveSession {
+  workoutId: string;
+  groupId?: string;
+  /** Nome exibido (pode incluir o grupo, ex.: "Treino A · Perna"). */
+  workoutName: string;
+  order: number;
+  currentExerciseIndex: number;
+  /** Séries concluídas, como `"<exerciseId>:<setIndex>"`. */
+  completedSetKeys: string[];
+  accumulatedMs: number;
+  lastResumeAt: number | null;
+  running: boolean;
+  updatedAt: number;
 }
 
 // ----- Entradas de CRUD (sem ids, gerados ao salvar) -----
@@ -67,6 +91,8 @@ export interface EditExercise {
   sets: string;
   reps: string;
   weight: string;
+  rest: string;
+  description: string;
 }
 
 export interface EditGroup {

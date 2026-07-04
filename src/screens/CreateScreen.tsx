@@ -2,7 +2,6 @@ import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React, { useMemo, useState } from 'react';
 import {
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -13,6 +12,7 @@ import {
   View,
 } from 'react-native';
 
+import { ConfirmSheet } from '@/components/ConfirmSheet';
 import { FocusInput } from '@/components/FocusInput';
 import { Icon } from '@/components/Icon';
 import { Screen } from '@/components/Screen';
@@ -24,13 +24,22 @@ import { RootStackParamList } from '@/navigation/types';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'Create'>;
 
-const NUMERIC_FIELDS: { label: string; field: keyof EditExercise }[] = [
+const NUMERIC_FIELDS: { label: string; field: keyof EditExercise; placeholder?: string }[] = [
   { label: 'Séries', field: 'sets' },
   { label: 'Reps', field: 'reps' },
-  { label: 'Peso (kg)', field: 'weight' },
+  { label: 'Peso(kg)', field: 'weight' },
+  { label: 'Descanso(s)', field: 'rest', placeholder: '90' },
+  { label: 'Descrição', field: 'description', placeholder: 'Ex.: Segurar 1 segundo no pico da contração...' },
 ];
 
-const emptyExercise = (): EditExercise => ({ name: '', sets: '3', reps: '10', weight: '' });
+const emptyExercise = (): EditExercise => ({
+  name: '',
+  sets: '3',
+  reps: '10',
+  weight: '',
+  rest: '90',
+  description: '',
+});
 const emptyGroup = (): EditGroup => ({ name: '', exercises: [emptyExercise()] });
 
 export function CreateScreen() {
@@ -55,6 +64,8 @@ export function CreateScreen() {
   const [groups, setGroups] = useState<EditGroup[]>(
     existing ? toEditGroups(existing) : [emptyGroup()],
   );
+  // Aviso de validação (substitui o Alert nativo).
+  const [warning, setWarning] = useState<{ title: string; message: string } | null>(null);
 
   // ---- operações de grupo ----
   const addGroup = () => setGroups((prev) => [...prev, emptyGroup()]);
@@ -86,6 +97,9 @@ export function CreateScreen() {
       ),
     );
 
+  const firstRow = NUMERIC_FIELDS.slice(0, 4);
+  const secondRow = NUMERIC_FIELDS.slice(4);
+
   const renderExerciseCard = (gi: number, ei: number, ex: EditExercise) => (
     <View key={ei} style={styles.exerciseCard}>
       <View style={styles.exerciseHeader}>
@@ -102,17 +116,36 @@ export function CreateScreen() {
         </Pressable>
       </View>
       <View style={styles.numericRow}>
-        {NUMERIC_FIELDS.map(({ label, field }) => (
+        {firstRow.map(({ label, field, placeholder }) => (
           <View key={field} style={styles.numericCol}>
             <Text style={styles.numericLabel}>{label.toUpperCase()}</Text>
             <FocusInput
               value={ex[field]}
               onChangeText={(t) => updateExercise(gi, ei, field, t)}
-              placeholder="—"
+              placeholder={placeholder ?? '—'}
               keyboardType="numeric"
               focusBorderColor="rgba(255, 20, 235, 0.4)"
               baseBorderColor={colors.borderStrong}
               inputStyle={styles.numericInput}
+            />
+          </View>
+        ))}
+      </View>
+      <View style={styles.numericRow}>
+        {secondRow.map(({ label, field, placeholder }) => (
+          <View key={field} style={styles.numericCol}>
+            <Text style={styles.numericLabel}>{label.toUpperCase()}</Text>
+            <FocusInput
+              value={ex[field]}
+              onChangeText={(t) => updateExercise(gi, ei, field, t)}
+              placeholder={placeholder ?? '—'}
+              multiline
+              numberOfLines={5}
+              textAlignVertical="top"
+              keyboardType="ascii-capable"
+              focusBorderColor="rgba(255, 20, 235, 0.4)"
+              baseBorderColor={colors.borderStrong}
+              inputStyle={styles.descriptionInput}
             />
           </View>
         ))}
@@ -133,8 +166,25 @@ export function CreateScreen() {
   const save = () => {
     const name = workoutName.trim();
     if (name.length === 0) {
-      Alert.alert('Nome obrigatório', 'Dê um nome ao treino antes de salvar.');
+      setWarning({
+        title: 'Nome obrigatório',
+        message: 'Dê um nome ao treino antes de salvar.',
+      });
       return;
+    }
+    // No modo com grupos, todo grupo que tenha exercícios precisa de nome —
+    // é o que mantém o treino separado por seções (Perna, Costas...).
+    if (grouped) {
+      const semNome = groups.some(
+        (g) => g.name.trim().length === 0 && g.exercises.some((e) => e.name.trim().length > 0),
+      );
+      if (semNome) {
+        setWarning({
+          title: 'Nome do grupo obrigatório',
+          message: 'Dê um nome a cada grupo (ex.: Perna, Costas) para separar o treino.',
+        });
+        return;
+      }
     }
     const input = { name, groups: fromEditGroups(groups) };
     if (isEditing && workoutId) {
@@ -226,6 +276,15 @@ export function CreateScreen() {
           )}
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <ConfirmSheet
+        visible={warning !== null}
+        title={warning?.title ?? ''}
+        message={warning?.message}
+        actions={[]}
+        cancelLabel="Entendi"
+        onClose={() => setWarning(null)}
+      />
     </Screen>
   );
 }
@@ -345,8 +404,9 @@ const styles = StyleSheet.create({
   numericLabel: {
     color: colors.textMuted,
     fontFamily: fonts.mono,
-    fontSize: 9,
-    marginBottom: 6,
+    fontSize: 8,
+    marginBottom: 2,
+    marginTop: 6,
     letterSpacing: 0.5,
   },
   numericInput: {
@@ -357,6 +417,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     fontFamily: fonts.mono,
+  },
+  descriptionInput: {
+    backgroundColor: colors.inputAlt,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    fontSize: 14,
+    fontFamily: fonts.mono,
+    minHeight: 100,
+    textAlignVertical: 'top',
   },
   addExerciseBtn: {
     flexDirection: 'row',

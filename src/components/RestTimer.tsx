@@ -9,6 +9,11 @@ import { ProgressBar } from './ProgressBar';
 interface Props {
   /** Segundos de descanso. > 0 abre o overlay; null/0 = fechado. */
   seconds: number | null;
+  /**
+   * Contador que muda a cada série concluída. Garante que o descanso reabra
+   * mesmo quando duas séries seguidas têm o mesmo tempo (ex.: 90s → 90s).
+   */
+  trigger?: number;
   upNextLabel?: string;
   onDismiss: () => void;
 }
@@ -18,15 +23,16 @@ interface Props {
  * contagem regressiva, permite ajustar (±15s) e pular. Toda a lógica de tempo
  * fica no useCountdown — aqui só desenha.
  */
-export function RestTimer({ seconds, upNextLabel, onDismiss }: Props) {
+export function RestTimer({ seconds, trigger, upNextLabel, onDismiss }: Props) {
   const countdown = useCountdown(onDismiss);
-  const visible = seconds != null && seconds > 0;
+  // A visibilidade segue o próprio countdown: aparece enquanto está contando.
+  const visible = countdown.running;
 
   useEffect(() => {
-    if (visible) countdown.start(seconds as number);
-    // reage só à mudança do valor solicitado
+    if (seconds != null && seconds > 0) countdown.start(seconds);
+    // dispara a cada série concluída (o trigger muda mesmo com tempos iguais)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [seconds]);
+  }, [trigger]);
 
   const skip = () => {
     countdown.stop();

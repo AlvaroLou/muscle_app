@@ -16,6 +16,7 @@
     "android": {
       "package": "com.workoutplanner.app",
       "versionCode": 1,
+      "softwareKeyboardLayoutMode": "pan",
       "adaptiveIcon": {
         "foregroundImage": "./assets/halteres.png",
         "backgroundColor": "#121212"

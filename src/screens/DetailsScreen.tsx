@@ -47,6 +47,9 @@ export function DetailsScreen() {
   }
 
   const letter = workoutLetter(index);
+  // Treino com seções nomeadas: cada grupo pode ser iniciado isoladamente.
+  const grouped =
+    workout.groups.length > 1 || workout.groups.some((g) => g.name.trim().length > 0);
 
   return (
     <Screen edges={['top', 'left', 'right']}>
@@ -90,8 +93,25 @@ export function DetailsScreen() {
         ) : (
           workout.groups.map((group) => (
             <View key={group.id} style={styles.group}>
-              {group.name.trim() ? (
-                <Text style={styles.groupLabel}>{group.name.toUpperCase()}</Text>
+              {grouped ? (
+                <View style={styles.groupHeader}>
+                  <Text style={styles.groupLabel}>
+                    {(group.name.trim() || 'Grupo').toUpperCase()}
+                  </Text>
+                  <Pressable
+                    hitSlop={8}
+                    style={({ pressed }) => [styles.groupStart, pressed && styles.groupStartPressed]}
+                    onPress={() =>
+                      navigation.navigate('ActiveWorkout', {
+                        workoutId: workout.id,
+                        groupId: group.id,
+                      })
+                    }
+                  >
+                    <Icon name="timer" size={13} color={colors.accent} />
+                    <Text style={styles.groupStartText}>Iniciar</Text>
+                  </Pressable>
+                </View>
               ) : null}
               {group.exercises.map((ex, i) => (
                 <View key={ex.id} style={styles.exerciseCard}>
@@ -135,7 +155,7 @@ export function DetailsScreen() {
       {/* Fixed bottom button */}
       <View style={styles.footer}>
         <GradientButton
-          label="INICIAR TREINO"
+          label={grouped ? 'INICIAR TREINO COMPLETO' : 'INICIAR TREINO'}
           icon="timer"
           onPress={() => navigation.navigate('ActiveWorkout', { workoutId: workout.id })}
         />
@@ -230,11 +250,35 @@ const styles = StyleSheet.create({
     gap: 12,
     marginTop: 4,
   },
+  groupHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   groupLabel: {
     color: colors.accent,
     fontFamily: fonts.bodyBold,
     fontSize: 12,
     letterSpacing: 2,
+  },
+  groupStart: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    backgroundColor: colors.accentTint,
+    borderWidth: 1,
+    borderColor: colors.accentBorder,
+  },
+  groupStartPressed: {
+    opacity: 0.7,
+  },
+  groupStartText: {
+    color: colors.accent,
+    fontFamily: fonts.bodyBold,
+    fontSize: 12,
   },
   emptyText: {
     color: colors.textMuted,

@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { ConfirmSheet } from '@/components/ConfirmSheet';
 import { GradientButton } from '@/components/GradientButton';
 import { Icon } from '@/components/Icon';
 import { Pill } from '@/components/Pill';
@@ -16,6 +17,7 @@ import {
   allExercises,
   estimatedDurationMin,
   nextWorkoutIndex,
+  startParamsFor,
   workoutLetter,
 } from '@/utils/workout';
 import { formatDuration } from '@/utils/time';
@@ -26,16 +28,9 @@ type Nav = CompositeNavigationProp<
   NativeStackNavigationProp<RootStackParamList>
 >;
 
-/** Volume total planejado (Σ séries×reps×carga) formatado, ou "—" se 0. */
-function formatVolume(kg: number): string {
-  if (kg <= 0) return '—';
-  if (kg >= 1000) return `${(kg / 1000).toFixed(1).replace('.0', '')}k`;
-  return String(Math.round(kg));
-}
-
 export function HomeScreen() {
   const navigation = useNavigation<Nav>();
-  const { workouts, sessions } = useWorkouts();
+  const { workouts, sessions, activeSession, clearSessions } = useWorkouts();
 
   // Próximo treino da rotação (A→B→C→A) a partir do último concluído.
   const todayIndex = nextWorkoutIndex(workouts, sessions);
@@ -50,23 +45,30 @@ export function HomeScreen() {
 
   // Estatísticas reais derivadas do store (nada fictício).
   const totalExercises = workouts.reduce((s, w) => s + allExercises(w).length, 0);
-  const totalVolume = workouts.reduce(
-    (s, w) => s + allExercises(w).reduce((a, e) => a + e.sets * e.reps * e.weight, 0),
-    0,
-  );
   const stats = [
     { label: 'Treinos', value: String(workouts.length), unit: 'criados' },
     { label: 'Exercícios', value: String(totalExercises), unit: 'no total' },
-    { label: 'Volume', value: formatVolume(totalVolume), unit: 'kg' },
+    { label: 'Sessões', value: String(sessions.length), unit: 'concluídas' },
   ];
 
   const startWorkout = () => {
     if (today) {
-      navigation.navigate('ActiveWorkout', { workoutId: today.id });
+      // Segue a semana: num treino com grupos, começa pelo próximo grupo.
+      navigation.navigate('ActiveWorkout', startParamsFor(today, sessions));
     } else {
       navigation.navigate('Workouts', { screen: 'WorkoutsList' });
     }
   };
+
+  const resumeWorkout = () => {
+    if (!activeSession) return;
+    navigation.navigate('ActiveWorkout', {
+      workoutId: activeSession.workoutId,
+      groupId: activeSession.groupId,
+    });
+  };
+
+  const [clearOpen, setClearOpen] = React.useState(false);
 
   const openToday = () => {
     if (today) {
@@ -100,6 +102,27 @@ export function HomeScreen() {
             <Text style={styles.avatarText}>CJ</Text>
           </LinearGradient>
         </View>
+
+        {/* Treino em andamento (retomar) */}
+        {activeSession ? (
+          <View style={styles.section}>
+            <Pressable
+              onPress={resumeWorkout}
+              style={({ pressed }) => [styles.resumeCard, pressed && styles.resumePressed]}
+            >
+              <View style={styles.resumeIcon}>
+                <Icon name="timer" size={20} color={colors.accent} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.resumeLabel}>TREINO EM ANDAMENTO</Text>
+                <Text style={styles.resumeName} numberOfLines={1}>
+                  {activeSession.workoutName}
+                </Text>
+              </View>
+              <Text style={styles.resumeCta}>Retomar</Text>
+            </Pressable>
+          </View>
+        ) : null}
 
         {/* Weekly tracker */}
         <View style={styles.section}>
@@ -218,7 +241,14 @@ export function HomeScreen() {
 
         {/* Recent */}
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>RECENTES</Text>
+          <View style={styles.recentHeader}>
+            <Text style={styles.sectionLabel}>RECENTES</Text>
+            {sessions.length > 0 ? (
+              <Pressable hitSlop={8} onPress={() => setClearOpen(true)}>
+                <Text style={styles.clearText}>Limpar</Text>
+              </Pressable>
+            ) : null}
+          </View>
           {recents.length === 0 ? (
             <View style={styles.recentEmpty}>
               <Icon name="history" size={20} color={colors.textMuted} />
@@ -248,6 +278,14 @@ export function HomeScreen() {
           )}
         </View>
       </ScrollView>
+
+      <ConfirmSheet
+        visible={clearOpen}
+        title="Limpar recentes"
+        message="Remover todo o histórico de sessões? Isso não afeta seus treinos."
+        onClose={() => setClearOpen(false)}
+        actions={[{ label: 'Limpar histórico', variant: 'danger', onPress: clearSessions }]}
+      />
     </Screen>
   );
 }
@@ -291,6 +329,56 @@ const styles = StyleSheet.create({
   section: {
     paddingHorizontal: 20,
     marginBottom: 20,
+  },
+  // Retomar treino
+  resumeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: colors.cardAlt,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.accentBorder,
+    padding: 14,
+  },
+  resumePressed: {
+    opacity: 0.85,
+  },
+  resumeIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: colors.accentTint,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  resumeLabel: {
+    color: colors.accent,
+    fontFamily: fonts.mono,
+    fontSize: 10,
+    letterSpacing: 1,
+  },
+  resumeName: {
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 15,
+    marginTop: 2,
+  },
+  resumeCta: {
+    color: colors.accent,
+    fontFamily: fonts.bodyBold,
+    fontSize: 14,
+  },
+  recentHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  clearText: {
+    color: colors.textSecondary,
+    fontFamily: fonts.bodyBold,
+    fontSize: 12,
+    marginBottom: 12,
   },
   // Weekly tracker
   trackerCard: {

@@ -5,11 +5,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  * `+1s` a cada tick, então não sofre drift nem congela se o app suspender.
  * Usado para a duração total do treino.
  */
-export function useStopwatch(autoStart = false) {
-  const [elapsedMs, setElapsedMs] = useState(0);
+export function useStopwatch(autoStart = false, initialElapsedMs = 0) {
+  const [elapsedMs, setElapsedMs] = useState(initialElapsedMs);
   const [running, setRunning] = useState(autoStart);
 
-  const startRef = useRef(Date.now());
+  const startRef = useRef(Date.now() - initialElapsedMs);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const elapsedRef = useRef(0);
   elapsedRef.current = elapsedMs;
