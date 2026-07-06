@@ -99,7 +99,7 @@ export function HomeScreen() {
             end={{ x: 1, y: 1 }}
             style={styles.avatar}
           >
-            <Text style={styles.avatarText}>CJ</Text>
+            <Text style={styles.avatarText}>AL</Text>
           </LinearGradient>
         </View>
 
@@ -204,7 +204,9 @@ export function HomeScreen() {
                   <Pressable onPress={openToday}>
                     <View style={styles.todayHeader}>
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.todayTag}>TREINO {workoutLetter(todayIndex)}</Text>
+                        <Text style={styles.todayTag} numberOfLines={1}>
+                          {today.name}
+                        </Text>
                         <Text style={styles.todayTitle} numberOfLines={1}>
                           {today.name}
                         </Text>
@@ -259,7 +261,11 @@ export function HomeScreen() {
           ) : (
             <View style={styles.recentList}>
               {recents.map((s) => (
-                <View key={s.id} style={styles.recentRow}>
+                <Pressable
+                  key={s.id}
+                  onPress={() => navigation.navigate('SessionSummary', { sessionId: s.id })}
+                  style={({ pressed }) => [styles.recentRow, pressed && styles.recentRowPressed]}
+                >
                   <View style={styles.recentBadge}>
                     <Text style={styles.recentBadgeText}>{workoutLetter(s.order)}</Text>
                   </View>
@@ -272,7 +278,8 @@ export function HomeScreen() {
                     </Text>
                   </View>
                   <Text style={styles.recentDuration}>{formatDuration(s.durationMs)}</Text>
-                </View>
+                  <Icon name="chevron-right" size={16} color={colors.textMuted} />
+                </Pressable>
               ))}
             </View>
           )}
@@ -534,6 +541,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     padding: 12,
+  },
+  recentRowPressed: {
+    opacity: 0.85,
   },
   recentBadge: {
     width: 40,

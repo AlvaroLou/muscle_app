@@ -87,6 +87,9 @@ function RunningSession({
   const logged = useRef(false);
   // true quando o treino foi finalizado ou descartado: não regravar em 2º plano.
   const endedRef = useRef(false);
+  // true quando o descanso aberto foi da última série do exercício: ao encerrar
+  // o descanso (pular ou tempo acabar), avança automaticamente para o próximo.
+  const advanceRef = useRef(false);
 
   const {
     elapsedMs,
@@ -184,10 +187,23 @@ function RunningSession({
     // Se a série estava incompleta, agora está sendo concluída → abre o descanso.
     // (Usamos o estado atual do render; o retorno do setState não é síncrono.)
     if (!set.completed) {
+      // Última série do exercício (e há próximo) → avança ao fim do descanso.
+      const isLastSet = set.setIndex === currentExerciseSets.length - 1;
+      advanceRef.current = isLastSet && !isLastExercise;
       setRest((prev) => ({
         seconds: currentExercise.rest || DEFAULT_REST_SECONDS,
         nonce: (prev?.nonce ?? 0) + 1,
       }));
+    }
+  };
+
+  // Encerra o descanso (pular ou tempo acabar). Se foi a última série do
+  // exercício, passa para o próximo automaticamente.
+  const handleRestDismiss = () => {
+    setRest(null);
+    if (advanceRef.current) {
+      advanceRef.current = false;
+      nextExercise();
     }
   };
 
@@ -204,7 +220,9 @@ function RunningSession({
         <View style={styles.center}>
           <Text style={styles.summaryEmoji}>🎉</Text>
           <Text style={styles.summaryTitle}>Treino concluído!</Text>
-          <Text style={styles.summarySub}>{workout.name}</Text>
+          <Text style={styles.summarySub} numberOfLines={2}>
+            {workout.name}
+          </Text>
           <View style={styles.summaryCard}>
             <View style={styles.summaryStat}>
               <Text style={styles.summaryValue}>{formatDuration(elapsedMs)}</Text>
@@ -259,11 +277,16 @@ function RunningSession({
         <Text style={styles.counter}>
           Exercício {currentExerciseIndex + 1} de {totalExercises}
         </Text>
-        <Text style={styles.exerciseName}>{currentExercise.name}</Text>
+        <Text style={styles.exerciseName} numberOfLines={2}>
+          {currentExercise.name}
+        </Text>
         <Text style={styles.exerciseMeta}>
           {currentExercise.reps} reps
           {currentExercise.weight > 0 ? ` · ${currentExercise.weight} kg` : ' · peso corporal'}
         </Text>
+        {currentExercise.description?.trim() ? (
+          <Text style={styles.exerciseDesc}>{currentExercise.description.trim()}</Text>
+        ) : null}
 
         <View style={styles.setList}>
           {currentExerciseSets.map((set) => {
@@ -307,7 +330,7 @@ function RunningSession({
         seconds={rest?.seconds ?? null}
         trigger={rest?.nonce ?? 0}
         upNextLabel={nextLabel}
-        onDismiss={() => setRest(null)}
+        onDismiss={handleRestDismiss}
       />
 
       <ConfirmSheet
@@ -408,6 +431,13 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 14,
     marginTop: 4,
+  },
+  exerciseDesc: {
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 8,
   },
   setList: {
     marginTop: 24,

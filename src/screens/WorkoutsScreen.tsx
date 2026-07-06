@@ -2,7 +2,11 @@ import { CompositeNavigationProp, useNavigation } from '@react-navigation/native
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import DraggableFlatList, {
+  RenderItemParams,
+  ScaleDecorator,
+} from 'react-native-draggable-flatlist';
 
 import { BottomSheet } from '@/components/BottomSheet';
 import { Icon } from '@/components/Icon';
@@ -28,7 +32,7 @@ type Nav = CompositeNavigationProp<
 
 export function WorkoutsScreen() {
   const navigation = useNavigation<Nav>();
-  const { workouts, sessions, deleteWorkout } = useWorkouts();
+  const { workouts, sessions, deleteWorkout, reorderWorkouts } = useWorkouts();
 
   const [typeSheet, setTypeSheet] = useState(false);
 
@@ -70,75 +74,92 @@ export function WorkoutsScreen() {
     if (id) deleteWorkout(id);
   };
 
+  const renderCard = ({ item: w, drag, isActive, getIndex }: RenderItemParams<Workout>) => {
+    const i = getIndex() ?? 0;
+    const badge = badgeFor(i);
+    return (
+      <ScaleDecorator>
+        <Pressable
+          onPress={() => navigation.navigate('Details', { workoutId: w.id })}
+          onLongPress={drag}
+          delayLongPress={200}
+          disabled={isActive}
+          style={({ pressed }) => [styles.card, (pressed || isActive) && styles.cardPressed]}
+        >
+          <View style={styles.cardRow}>
+            <View style={styles.cardLeft}>
+              <Pressable hitSlop={10} onLongPress={drag} onPressIn={drag} style={styles.dragHandle}>
+                <Icon name="grip" size={18} color={colors.textMuted} />
+              </Pressable>
+              <View style={[styles.badge, { backgroundColor: badge.tint }]}>
+                <Text style={[styles.badgeText, { color: badge.color }]}>
+                  {workoutLetter(i)}
+                </Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.workoutLabel} numberOfLines={1}>
+                  {w.name}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.cardRight}>
+              <View style={styles.metaCol}>
+                <Text style={styles.metaEx}>{allExercises(w).length} ex</Text>
+                <Text style={styles.metaMin}>{estimatedDurationMin(w)} min</Text>
+              </View>
+              <Pressable hitSlop={8} onPress={() => openMenu(w)}>
+                <Icon name="more" size={18} color={colors.textMuted} />
+              </Pressable>
+            </View>
+          </View>
+
+          {groupTags(w).length > 0 ? (
+            <View style={styles.tags}>
+              {groupTags(w).map((groupName) => (
+                <Pill
+                  key={groupName}
+                  label={groupName}
+                  color={colors.textDim2}
+                  background={colors.white05}
+                  style={styles.tag}
+                  textStyle={styles.tagText}
+                />
+              ))}
+            </View>
+          ) : null}
+        </Pressable>
+      </ScaleDecorator>
+    );
+  };
+
   return (
     <Screen>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Minha Rotina</Text>
-          <Text style={styles.subtitle}>
-            {workouts.length} {workouts.length === 1 ? 'treino configurado' : 'treinos configurados'}
-          </Text>
-        </View>
-
-        {workouts.length === 0 ? (
+      <DraggableFlatList
+        data={workouts}
+        keyExtractor={(w) => w.id}
+        onDragEnd={({ data }) => reorderWorkouts(data)}
+        renderItem={renderCard}
+        containerStyle={{ flex: 1 }}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        ListHeaderComponent={
+          <View style={styles.header}>
+            <Text style={styles.title}>Minha Rotina</Text>
+            <Text style={styles.subtitle}>
+              {workouts.length}{' '}
+              {workouts.length === 1 ? 'treino configurado' : 'treinos configurados'}
+              {workouts.length > 1 ? ' · segure para arrastar' : ''}
+            </Text>
+          </View>
+        }
+        ListEmptyComponent={
           <View style={styles.empty}>
             <Text style={styles.emptyText}>
               Nenhum treino ainda.{'\n'}Toque no + para criar o primeiro.
             </Text>
           </View>
-        ) : (
-          <View style={styles.list}>
-            {workouts.map((w, i) => {
-              const badge = badgeFor(i);
-              return (
-                <Pressable
-                  key={w.id}
-                  style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
-                  onPress={() => navigation.navigate('Details', { workoutId: w.id })}
-                >
-                  <View style={styles.cardRow}>
-                    <View style={styles.cardLeft}>
-                      <View style={[styles.badge, { backgroundColor: badge.tint }]}>
-                        <Text style={[styles.badgeText, { color: badge.color }]}>
-                          {workoutLetter(i)}
-                        </Text>
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.workoutName}>Treino {workoutLetter(i)}</Text>
-                        <Text style={styles.workoutLabel} numberOfLines={1}>
-                          {w.name}
-                        </Text>
-                      </View>
-                    </View>
-                    <View style={styles.cardRight}>
-                      <View style={styles.metaCol}>
-                        <Text style={styles.metaEx}>{allExercises(w).length} ex</Text>
-                        <Text style={styles.metaMin}>{estimatedDurationMin(w)} min</Text>
-                      </View>
-                      <Pressable hitSlop={8} onPress={() => openMenu(w)}>
-                        <Icon name="more" size={18} color={colors.textMuted} />
-                      </Pressable>
-                    </View>
-                  </View>
-
-                  <View style={styles.tags}>
-                    {groupTags(w).map((groupName) => (
-                      <Pill
-                        key={groupName}
-                        label={groupName}
-                        color={colors.textDim2}
-                        background={colors.white05}
-                        style={styles.tag}
-                        textStyle={styles.tagText}
-                      />
-                    ))}
-                  </View>
-                </Pressable>
-              );
-            })}
-          </View>
-        )}
-      </ScrollView>
+        }
+      />
 
       {/* FAB */}
       <Pressable
@@ -390,6 +411,11 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: colors.border,
+    marginHorizontal: 20,
+    marginBottom: 12,
+  },
+  dragHandle: {
+    paddingHorizontal: 2,
   },
   cardPressed: {
     opacity: 0.9,
@@ -417,16 +443,10 @@ const styles = StyleSheet.create({
     fontFamily: fonts.heading,
     fontSize: 16,
   },
-  workoutName: {
+  workoutLabel: {
     color: colors.text,
     fontFamily: fonts.bodyBold,
     fontSize: 14,
-  },
-  workoutLabel: {
-    color: colors.textSecondary,
-    fontFamily: fonts.body,
-    fontSize: 12,
-    marginTop: 2,
   },
   cardRight: {
     flexDirection: 'row',
@@ -449,6 +469,7 @@ const styles = StyleSheet.create({
   },
   tags: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
     marginTop: 12,
   },

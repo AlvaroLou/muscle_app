@@ -11,6 +11,8 @@ module.exports = function (api) {
           },
         },
       ],
+      // Reanimated 4 usa o plugin do worklets, que precisa ser o ÚLTIMO.
+      'react-native-worklets/plugin',
     ],
   };
 };

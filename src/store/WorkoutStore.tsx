@@ -10,7 +10,14 @@ import React, {
 import { activeSessionRepository } from '@/repositories/activeSessionRepository';
 import { sessionRepository } from '@/repositories/sessionRepository';
 import { workoutRepository } from '@/repositories/workoutRepository';
-import { ActiveSession, ExerciseGroup, Workout, WorkoutInput, WorkoutSession } from '@/types';
+import {
+  ActiveSession,
+  Exercise,
+  ExerciseGroup,
+  Workout,
+  WorkoutInput,
+  WorkoutSession,
+} from '@/types';
 import { createId } from '@/utils/id';
 import { normalizeWorkout } from '@/utils/workout';
 
@@ -42,6 +49,12 @@ interface WorkoutStoreValue {
   createWorkout: (input: WorkoutInput) => Workout;
   updateWorkout: (id: string, input: WorkoutInput) => void;
   deleteWorkout: (id: string) => void;
+  /** Define a nova ordem completa dos treinos (usado no arrastar-e-soltar). */
+  reorderWorkouts: (ordered: Workout[]) => void;
+  /** Reordena os grupos de um treino. */
+  reorderGroups: (workoutId: string, ordered: ExerciseGroup[]) => void;
+  /** Reordena os exercícios de um grupo. */
+  reorderExercises: (workoutId: string, groupId: string, ordered: Exercise[]) => void;
   /** Registra uma sessão concluída no histórico. */
   logSession: (input: SessionInput) => void;
   /** Limpa todo o histórico de sessões (recentes). */
@@ -148,7 +161,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         createdAt: now,
         updatedAt: now,
       };
-      commit((prev) => [workout, ...prev]);
+      commit((prev) => [...prev, workout]);
       return workout;
     },
     [commit],
@@ -179,6 +192,43 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     [commit],
   );
 
+  const reorderWorkouts = useCallback(
+    (ordered: Workout[]) => {
+      commit(() => ordered);
+    },
+    [commit],
+  );
+
+  const reorderGroups = useCallback(
+    (workoutId: string, ordered: ExerciseGroup[]) => {
+      commit((prev) =>
+        prev.map((w) =>
+          w.id === workoutId ? { ...w, groups: ordered, updatedAt: Date.now() } : w,
+        ),
+      );
+    },
+    [commit],
+  );
+
+  const reorderExercises = useCallback(
+    (workoutId: string, groupId: string, ordered: Exercise[]) => {
+      commit((prev) =>
+        prev.map((w) =>
+          w.id === workoutId
+            ? {
+                ...w,
+                groups: w.groups.map((g) =>
+                  g.id === groupId ? { ...g, exercises: ordered } : g,
+                ),
+                updatedAt: Date.now(),
+              }
+            : w,
+        ),
+      );
+    },
+    [commit],
+  );
+
   const value = useMemo<WorkoutStoreValue>(
     () => ({
       workouts,
@@ -189,6 +239,9 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       createWorkout,
       updateWorkout,
       deleteWorkout,
+      reorderWorkouts,
+      reorderGroups,
+      reorderExercises,
       logSession,
       clearSessions,
       saveActiveSession,
@@ -203,6 +256,9 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       createWorkout,
       updateWorkout,
       deleteWorkout,
+      reorderWorkouts,
+      reorderGroups,
+      reorderExercises,
       logSession,
       clearSessions,
       saveActiveSession,

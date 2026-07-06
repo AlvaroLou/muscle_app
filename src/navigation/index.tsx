@@ -7,7 +7,8 @@ import { ActiveWorkoutScreen } from '@/screens/ActiveWorkoutScreen';
 import { DetailsScreen } from '@/screens/DetailsScreen';
 import { CreateScreen } from '@/screens/CreateScreen';
 import { HomeScreen } from '@/screens/HomeScreen';
-import { HistoryScreen, ProfileScreen } from '@/screens/PlaceholderScreen';
+import { HistoryScreen } from '@/screens/HistoryScreen';
+import { SessionSummaryScreen } from '@/screens/SessionSummaryScreen';
 import { WorkoutsScreen } from '@/screens/WorkoutsScreen';
 import { colors, fonts } from '@/theme';
 import { RootStackParamList, TabsParamList, WorkoutsStackParamList } from './types';
@@ -63,8 +64,8 @@ function TabsNavigator() {
         component={WorkoutsNavigator}
         options={{ title: 'Meus treinos' }}
       />
-      {/* <Tabs.Screen name="History" component={HistoryScreen} options={{ title: 'History' }} />
-      <Tabs.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profile' }} /> */}
+      <Tabs.Screen name="History" component={HistoryScreen} options={{ title: 'Histórico' }} />
+      {/* <Tabs.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profile' }} /> */}
     </Tabs.Navigator>
   );
 }
@@ -83,6 +84,11 @@ export function RootNavigator() {
         name="ActiveWorkout"
         component={ActiveWorkoutScreen}
         options={{ presentation: 'fullScreenModal' }}
+      />
+      <RootStack.Screen
+        name="SessionSummary"
+        component={SessionSummaryScreen}
+        options={{ presentation: 'modal' }}
       />
     </RootStack.Navigator>
   );

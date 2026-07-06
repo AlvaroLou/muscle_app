@@ -15,6 +15,10 @@ export type IconName =
   | 'plus'
   | 'chevron-left'
   | 'chevron-right'
+  | 'chevron-up'
+  | 'chevron-down'
+  | 'arrow-up'
+  | 'arrow-down'
   | 'edit'
   | 'trash'
   | 'grip'
@@ -37,6 +41,10 @@ const FEATHER: Partial<Record<IconName, keyof typeof Feather.glyphMap>> = {
   plus: 'plus',
   'chevron-left': 'chevron-left',
   'chevron-right': 'chevron-right',
+  'chevron-up': 'chevron-up',
+  'chevron-down': 'chevron-down',
+  'arrow-up': 'arrow-up',
+  'arrow-down': 'arrow-down',
   edit: 'edit-2',
   trash: 'trash-2',
   x: 'x',

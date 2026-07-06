@@ -102,6 +102,7 @@ function toEditExercise(e: Exercise): EditExercise {
     reps: String(e.reps),
     weight: e.weight > 0 ? String(e.weight) : '',
     rest: e.rest > 0 ? String(e.rest) : '',
+    description: e.description ?? '',
   };
 }
 
@@ -122,6 +123,7 @@ function fromEditExercises(list: EditExercise[]): ExerciseInput[] {
       reps: toInt(e.reps),
       weight: toNumber(e.weight),
       rest: toInt(e.rest),
+      description: e.description.trim(),
     }));
 }
 

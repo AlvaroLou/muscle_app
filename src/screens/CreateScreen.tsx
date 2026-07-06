@@ -5,12 +5,17 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import {
+  NestableDraggableFlatList,
+  NestableScrollContainer,
+  RenderItemParams,
+  ScaleDecorator,
+} from 'react-native-draggable-flatlist';
 
 import { ConfirmSheet } from '@/components/ConfirmSheet';
 import { FocusInput } from '@/components/FocusInput';
@@ -19,10 +24,15 @@ import { Screen } from '@/components/Screen';
 import { useWorkouts } from '@/store/WorkoutStore';
 import { EditExercise, EditGroup } from '@/types';
 import { colors, fonts } from '@/theme';
+import { createId } from '@/utils/id';
 import { fromEditGroups, toEditGroups } from '@/utils/workout';
 import { RootStackParamList } from '@/navigation/types';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'Create'>;
+
+// Rascunhos com chave estável — necessária para o arrastar-e-soltar.
+type DraftExercise = EditExercise & { key: string };
+type DraftGroup = { key: string; name: string; exercises: DraftExercise[] };
 
 const NUMERIC_FIELDS: { label: string; field: keyof EditExercise; placeholder?: string }[] = [
   { label: 'Séries', field: 'sets' },
@@ -31,8 +41,11 @@ const NUMERIC_FIELDS: { label: string; field: keyof EditExercise; placeholder?: 
   { label: 'Descanso(s)', field: 'rest', placeholder: '90' },
   { label: 'Descrição', field: 'description', placeholder: 'Ex.: Segurar 1 segundo no pico da contração...' },
 ];
+const firstRow = NUMERIC_FIELDS.slice(0, 4);
+const secondRow = NUMERIC_FIELDS.slice(4);
 
-const emptyExercise = (): EditExercise => ({
+const emptyExercise = (): DraftExercise => ({
+  key: createId('ek_'),
   name: '',
   sets: '3',
   reps: '10',
@@ -40,7 +53,28 @@ const emptyExercise = (): EditExercise => ({
   rest: '90',
   description: '',
 });
-const emptyGroup = (): EditGroup => ({ name: '', exercises: [emptyExercise()] });
+const emptyGroup = (): DraftGroup => ({
+  key: createId('gk_'),
+  name: '',
+  exercises: [emptyExercise()],
+});
+
+/** Adiciona chaves a um EditGroup vindo do domínio. */
+function withKeys(groups: EditGroup[]): DraftGroup[] {
+  return groups.map((g) => ({
+    key: createId('gk_'),
+    name: g.name,
+    exercises: g.exercises.map((e) => ({ ...e, key: createId('ek_') })),
+  }));
+}
+
+/** Remove as chaves antes de salvar. */
+function stripKeys(groups: DraftGroup[]): EditGroup[] {
+  return groups.map((g) => ({
+    name: g.name,
+    exercises: g.exercises.map(({ key, ...e }) => e),
+  }));
+}
 
 export function CreateScreen() {
   const navigation = useNavigation<Nav>();
@@ -55,107 +89,56 @@ export function CreateScreen() {
   const isEditing = Boolean(existing);
 
   // Modo: "simple" = lista plana de exercícios; "grouped" = seções (Perna...).
-  // Ao editar, é inferido do treino; ao criar, vem do seletor (param `mode`).
   const grouped = existing
     ? existing.groups.length > 1 || existing.groups.some((g) => g.name.trim().length > 0)
     : route.params?.mode !== 'simple';
 
   const [workoutName, setWorkoutName] = useState(existing?.name ?? '');
-  const [groups, setGroups] = useState<EditGroup[]>(
-    existing ? toEditGroups(existing) : [emptyGroup()],
+  const [groups, setGroups] = useState<DraftGroup[]>(
+    existing ? withKeys(toEditGroups(existing)) : [emptyGroup()],
   );
-  // Aviso de validação (substitui o Alert nativo).
   const [warning, setWarning] = useState<{ title: string; message: string } | null>(null);
 
-  // ---- operações de grupo ----
+  // ---- operações de grupo (por chave) ----
   const addGroup = () => setGroups((prev) => [...prev, emptyGroup()]);
-  const removeGroup = (gi: number) =>
-    setGroups((prev) => prev.filter((_, i) => i !== gi));
-  const updateGroupName = (gi: number, name: string) =>
-    setGroups((prev) => prev.map((g, i) => (i === gi ? { ...g, name } : g)));
+  const removeGroup = (key: string) => setGroups((prev) => prev.filter((g) => g.key !== key));
+  const updateGroupName = (key: string, name: string) =>
+    setGroups((prev) => prev.map((g) => (g.key === key ? { ...g, name } : g)));
+  const reorderGroupsLocal = (ordered: DraftGroup[]) => setGroups(ordered);
 
-  // ---- operações de exercício (dentro de um grupo) ----
-  const addExercise = (gi: number) =>
+  // ---- operações de exercício (por chave) ----
+  const addExercise = (gKey: string) =>
     setGroups((prev) =>
-      prev.map((g, i) => (i === gi ? { ...g, exercises: [...g.exercises, emptyExercise()] } : g)),
+      prev.map((g) => (g.key === gKey ? { ...g, exercises: [...g.exercises, emptyExercise()] } : g)),
     );
-  const removeExercise = (gi: number, ei: number) =>
+  const removeExercise = (gKey: string, eKey: string) =>
     setGroups((prev) =>
-      prev.map((g, i) =>
-        i === gi ? { ...g, exercises: g.exercises.filter((_, j) => j !== ei) } : g,
+      prev.map((g) =>
+        g.key === gKey ? { ...g, exercises: g.exercises.filter((e) => e.key !== eKey) } : g,
       ),
     );
-  const updateExercise = (gi: number, ei: number, field: keyof EditExercise, val: string) =>
+  const updateExercise = (
+    gKey: string,
+    eKey: string,
+    field: keyof EditExercise,
+    val: string,
+  ) =>
     setGroups((prev) =>
-      prev.map((g, i) =>
-        i === gi
+      prev.map((g) =>
+        g.key === gKey
           ? {
               ...g,
-              exercises: g.exercises.map((ex, j) => (j === ei ? { ...ex, [field]: val } : ex)),
+              exercises: g.exercises.map((ex) => (ex.key === eKey ? { ...ex, [field]: val } : ex)),
             }
           : g,
       ),
     );
+  const reorderExercisesLocal = (gKey: string, ordered: DraftExercise[]) =>
+    setGroups((prev) => prev.map((g) => (g.key === gKey ? { ...g, exercises: ordered } : g)));
 
-  const firstRow = NUMERIC_FIELDS.slice(0, 4);
-  const secondRow = NUMERIC_FIELDS.slice(4);
-
-  const renderExerciseCard = (gi: number, ei: number, ex: EditExercise) => (
-    <View key={ei} style={styles.exerciseCard}>
-      <View style={styles.exerciseHeader}>
-        <TextInput
-          value={ex.name}
-          onChangeText={(t) => updateExercise(gi, ei, 'name', t)}
-          placeholder="Nome do exercício"
-          placeholderTextColor={colors.textMuted}
-          selectionColor={colors.accent}
-          style={styles.exerciseNameInput}
-        />
-        <Pressable hitSlop={8} onPress={() => removeExercise(gi, ei)}>
-          <Icon name="x" size={16} color={colors.textMuted} />
-        </Pressable>
-      </View>
-      <View style={styles.numericRow}>
-        {firstRow.map(({ label, field, placeholder }) => (
-          <View key={field} style={styles.numericCol}>
-            <Text style={styles.numericLabel}>{label.toUpperCase()}</Text>
-            <FocusInput
-              value={ex[field]}
-              onChangeText={(t) => updateExercise(gi, ei, field, t)}
-              placeholder={placeholder ?? '—'}
-              keyboardType="numeric"
-              focusBorderColor="rgba(255, 20, 235, 0.4)"
-              baseBorderColor={colors.borderStrong}
-              inputStyle={styles.numericInput}
-            />
-          </View>
-        ))}
-      </View>
-      <View style={styles.numericRow}>
-        {secondRow.map(({ label, field, placeholder }) => (
-          <View key={field} style={styles.numericCol}>
-            <Text style={styles.numericLabel}>{label.toUpperCase()}</Text>
-            <FocusInput
-              value={ex[field]}
-              onChangeText={(t) => updateExercise(gi, ei, field, t)}
-              placeholder={placeholder ?? '—'}
-              multiline
-              numberOfLines={5}
-              textAlignVertical="top"
-              keyboardType="ascii-capable"
-              focusBorderColor="rgba(255, 20, 235, 0.4)"
-              baseBorderColor={colors.borderStrong}
-              inputStyle={styles.descriptionInput}
-            />
-          </View>
-        ))}
-      </View>
-    </View>
-  );
-
-  const renderAddExercise = (gi: number) => (
+  const renderAddExercise = (gKey: string) => (
     <Pressable
-      onPress={() => addExercise(gi)}
+      onPress={() => addExercise(gKey)}
       style={({ pressed }) => [styles.addExerciseBtn, pressed && styles.pressed]}
     >
       <Icon name="plus" size={16} color={colors.accent} />
@@ -163,17 +146,111 @@ export function CreateScreen() {
     </Pressable>
   );
 
+  const renderExerciseItem =
+    (gKey: string) =>
+    ({ item: ex, drag, isActive }: RenderItemParams<DraftExercise>) => (
+      <ScaleDecorator>
+        <View style={[styles.exerciseCard, isActive && styles.cardActive]}>
+          <View style={styles.exerciseHeader}>
+            <Pressable hitSlop={8} onPressIn={drag} onLongPress={drag} style={styles.dragHandle}>
+              <Icon name="grip" size={16} color={colors.textMuted} />
+            </Pressable>
+            <TextInput
+              value={ex.name}
+              onChangeText={(t) => updateExercise(gKey, ex.key, 'name', t)}
+              placeholder="Nome do exercício"
+              placeholderTextColor={colors.textMuted}
+              selectionColor={colors.accent}
+              style={styles.exerciseNameInput}
+            />
+            <Pressable hitSlop={8} onPress={() => removeExercise(gKey, ex.key)}>
+              <Icon name="x" size={16} color={colors.textMuted} />
+            </Pressable>
+          </View>
+          <View style={styles.numericRow}>
+            {firstRow.map(({ label, field, placeholder }) => (
+              <View key={field} style={styles.numericCol}>
+                <Text style={styles.numericLabel}>{label.toUpperCase()}</Text>
+                <FocusInput
+                  value={ex[field]}
+                  onChangeText={(t) => updateExercise(gKey, ex.key, field, t)}
+                  placeholder={placeholder ?? '—'}
+                  keyboardType="numeric"
+                  focusBorderColor="rgba(255, 20, 235, 0.4)"
+                  baseBorderColor={colors.borderStrong}
+                  inputStyle={styles.numericInput}
+                />
+              </View>
+            ))}
+          </View>
+          <View style={styles.numericRow}>
+            {secondRow.map(({ label, field, placeholder }) => (
+              <View key={field} style={styles.numericCol}>
+                <Text style={styles.numericLabel}>{label.toUpperCase()}</Text>
+                <FocusInput
+                  value={ex[field]}
+                  onChangeText={(t) => updateExercise(gKey, ex.key, field, t)}
+                  placeholder={placeholder ?? '—'}
+                  multiline
+                  numberOfLines={5}
+                  textAlignVertical="top"
+                  keyboardType="ascii-capable"
+                  focusBorderColor="rgba(255, 20, 235, 0.4)"
+                  baseBorderColor={colors.borderStrong}
+                  inputStyle={styles.descriptionInput}
+                />
+              </View>
+            ))}
+          </View>
+        </View>
+      </ScaleDecorator>
+    );
+
+  const renderGroupCard = ({
+    item: group,
+    drag,
+    isActive,
+    getIndex,
+  }: RenderItemParams<DraftGroup>) => (
+    <ScaleDecorator>
+      <View style={[styles.groupCard, isActive && styles.cardActive]}>
+        <View style={styles.groupHeader}>
+          <Pressable hitSlop={8} onPressIn={drag} onLongPress={drag} style={styles.dragHandle}>
+            <Icon name="grip" size={18} color={colors.textMuted} />
+          </Pressable>
+          <View style={styles.groupBadge}>
+            <Text style={styles.groupBadgeText}>{(getIndex() ?? 0) + 1}</Text>
+          </View>
+          <TextInput
+            value={group.name}
+            onChangeText={(t) => updateGroupName(group.key, t)}
+            placeholder="Nome do grupo (ex.: Perna)"
+            placeholderTextColor={colors.textMuted}
+            selectionColor={colors.accent}
+            style={styles.groupNameInput}
+          />
+          <Pressable hitSlop={8} onPress={() => removeGroup(group.key)}>
+            <Icon name="trash" size={18} color={colors.danger} />
+          </Pressable>
+        </View>
+
+        <NestableDraggableFlatList
+          data={group.exercises}
+          keyExtractor={(e) => e.key}
+          onDragEnd={({ data }) => reorderExercisesLocal(group.key, data)}
+          renderItem={renderExerciseItem(group.key)}
+          ListFooterComponent={renderAddExercise(group.key)}
+        />
+      </View>
+    </ScaleDecorator>
+  );
+
   const save = () => {
     const name = workoutName.trim();
     if (name.length === 0) {
-      setWarning({
-        title: 'Nome obrigatório',
-        message: 'Dê um nome ao treino antes de salvar.',
-      });
+      setWarning({ title: 'Nome obrigatório', message: 'Dê um nome ao treino antes de salvar.' });
       return;
     }
-    // No modo com grupos, todo grupo que tenha exercícios precisa de nome —
-    // é o que mantém o treino separado por seções (Perna, Costas...).
     if (grouped) {
       const semNome = groups.some(
         (g) => g.name.trim().length === 0 && g.exercises.some((e) => e.name.trim().length > 0),
@@ -186,7 +263,7 @@ export function CreateScreen() {
         return;
       }
     }
-    const input = { name, groups: fromEditGroups(groups) };
+    const input = { name, groups: fromEditGroups(stripKeys(groups)) };
     if (isEditing && workoutId) {
       updateWorkout(workoutId, input);
     } else {
@@ -214,13 +291,13 @@ export function CreateScreen() {
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <ScrollView
+        <NestableScrollContainer
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.content}
         >
           {/* Workout name */}
-          <View>
+          <View style={styles.block}>
             <Text style={styles.fieldLabel}>NOME DO TREINO</Text>
             <FocusInput
               value={workoutName}
@@ -232,32 +309,12 @@ export function CreateScreen() {
 
           {grouped ? (
             <>
-              {/* Modo com grupos (seções) */}
-              {groups.map((group, gi) => (
-                <View key={gi} style={styles.groupCard}>
-                  <View style={styles.groupHeader}>
-                    <View style={styles.groupBadge}>
-                      <Text style={styles.groupBadgeText}>{gi + 1}</Text>
-                    </View>
-                    <TextInput
-                      value={group.name}
-                      onChangeText={(t) => updateGroupName(gi, t)}
-                      placeholder="Nome do grupo (ex.: Perna)"
-                      placeholderTextColor={colors.textMuted}
-                      selectionColor={colors.accent}
-                      style={styles.groupNameInput}
-                    />
-                    <Pressable hitSlop={8} onPress={() => removeGroup(gi)}>
-                      <Icon name="trash" size={18} color={colors.danger} />
-                    </Pressable>
-                  </View>
-
-                  {group.exercises.map((ex, ei) => renderExerciseCard(gi, ei, ex))}
-                  {renderAddExercise(gi)}
-                </View>
-              ))}
-
-              {/* Add group */}
+              <NestableDraggableFlatList
+                data={groups}
+                keyExtractor={(g) => g.key}
+                onDragEnd={({ data }) => reorderGroupsLocal(data)}
+                renderItem={renderGroupCard}
+              />
               <Pressable
                 onPress={addGroup}
                 style={({ pressed }) => [styles.addGroupBtn, pressed && styles.pressed]}
@@ -267,14 +324,20 @@ export function CreateScreen() {
               </Pressable>
             </>
           ) : (
-            <>
-              {/* Modo simples (lista plana de exercícios) */}
+            <View style={styles.block}>
               <Text style={styles.fieldLabel}>EXERCÍCIOS</Text>
-              {groups[0]?.exercises.map((ex, ei) => renderExerciseCard(0, ei, ex))}
-              {renderAddExercise(0)}
-            </>
+              <NestableDraggableFlatList
+                data={groups[0]?.exercises ?? []}
+                keyExtractor={(e) => e.key}
+                onDragEnd={({ data }) =>
+                  groups[0] && reorderExercisesLocal(groups[0].key, data)
+                }
+                renderItem={renderExerciseItem(groups[0]?.key ?? '')}
+                ListFooterComponent={groups[0] ? renderAddExercise(groups[0].key) : null}
+              />
+            </View>
           )}
-        </ScrollView>
+        </NestableScrollContainer>
       </KeyboardAvoidingView>
 
       <ConfirmSheet
@@ -319,7 +382,10 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 20,
     paddingVertical: 20,
-    gap: 20,
+    gap: 16,
+  },
+  block: {
+    gap: 0,
   },
   fieldLabel: {
     color: colors.textSecondary,
@@ -339,6 +405,13 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.85,
   },
+  dragHandle: {
+    paddingHorizontal: 2,
+  },
+  cardActive: {
+    opacity: 0.95,
+    borderColor: colors.accentBorder,
+  },
   // Grupo
   groupCard: {
     backgroundColor: colors.card,
@@ -347,11 +420,12 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     padding: 14,
     gap: 10,
+    marginBottom: 12,
   },
   groupHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
   },
   groupBadge: {
     width: 28,
@@ -380,6 +454,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.borderStrong,
     padding: 12,
+    marginBottom: 10,
   },
   exerciseHeader: {
     flexDirection: 'row',

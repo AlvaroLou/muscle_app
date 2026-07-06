@@ -13,6 +13,8 @@ export interface Exercise {
   weight: number;
   /** Descanso entre séries, em segundos. 0 = usar o padrão global. */
   rest: number;
+  /** Observação livre (ex.: técnica, cadência). Pode ser vazia. */
+  description: string;
 }
 
 /** Um grupo/seção de exercícios dentro do treino (ex.: "Perna"). */
