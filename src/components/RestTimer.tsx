@@ -1,8 +1,10 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useCountdown } from '@/hooks/useCountdown';
-import { colors, fonts } from '@/theme';
+import { fonts, ThemeColors } from '@/theme';
+import { useTheme } from '@/theme/ThemeProvider';
 import { formatClock } from '@/utils/time';
 import { ProgressBar } from './ProgressBar';
 
@@ -24,6 +26,9 @@ interface Props {
  * fica no useCountdown — aqui só desenha.
  */
 export function RestTimer({ seconds, trigger, upNextLabel, onDismiss }: Props) {
+  const { t } = useTranslation();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const countdown = useCountdown(onDismiss);
   // A visibilidade segue o próprio countdown: aparece enquanto está contando.
   const visible = countdown.running;
@@ -43,7 +48,7 @@ export function RestTimer({ seconds, trigger, upNextLabel, onDismiss }: Props) {
     <Modal visible={visible} transparent animationType="fade" onRequestClose={skip}>
       <View style={styles.backdrop}>
         <View style={styles.sheet}>
-          <Text style={styles.label}>DESCANSO</Text>
+          <Text style={styles.label}>{t('rest.title')}</Text>
           <Text style={styles.time}>{formatClock(countdown.remaining)}</Text>
 
           <View style={styles.progress}>
@@ -52,7 +57,7 @@ export function RestTimer({ seconds, trigger, upNextLabel, onDismiss }: Props) {
 
           {upNextLabel ? (
             <Text style={styles.upNext}>
-              A seguir: <Text style={styles.upNextStrong}>{upNextLabel}</Text>
+              {t('rest.upNext')} <Text style={styles.upNextStrong}>{upNextLabel}</Text>
             </Text>
           ) : null}
 
@@ -66,7 +71,7 @@ export function RestTimer({ seconds, trigger, upNextLabel, onDismiss }: Props) {
           </View>
 
           <Pressable onPress={skip} hitSlop={8}>
-            <Text style={styles.skip}>Pular descanso</Text>
+            <Text style={styles.skip}>{t('rest.skip')}</Text>
           </Pressable>
         </View>
       </View>
@@ -74,7 +79,8 @@ export function RestTimer({ seconds, trigger, upNextLabel, onDismiss }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.7)',
@@ -142,4 +148,4 @@ const styles = StyleSheet.create({
     fontSize: 14,
     paddingVertical: 4,
   },
-});
+  });

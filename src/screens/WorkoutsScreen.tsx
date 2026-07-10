@@ -1,7 +1,8 @@
 import { CompositeNavigationProp, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import DraggableFlatList, {
   RenderItemParams,
@@ -14,7 +15,8 @@ import { Pill } from '@/components/Pill';
 import { Screen } from '@/components/Screen';
 import { useWorkouts } from '@/store/WorkoutStore';
 import { Workout } from '@/types';
-import { colors, fonts, gradients } from '@/theme';
+import { fonts, ThemeColors } from '@/theme';
+import { useTheme } from '@/theme/ThemeProvider';
 import {
   allExercises,
   badgeFor,
@@ -32,6 +34,9 @@ type Nav = CompositeNavigationProp<
 
 export function WorkoutsScreen() {
   const navigation = useNavigation<Nav>();
+  const { t } = useTranslation();
+  const { colors, gradients } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { workouts, sessions, deleteWorkout, reorderWorkouts } = useWorkouts();
 
   const [typeSheet, setTypeSheet] = useState(false);
@@ -76,7 +81,7 @@ export function WorkoutsScreen() {
 
   const renderCard = ({ item: w, drag, isActive, getIndex }: RenderItemParams<Workout>) => {
     const i = getIndex() ?? 0;
-    const badge = badgeFor(i);
+    const badge = badgeFor(i, colors);
     return (
       <ScaleDecorator>
         <Pressable
@@ -104,8 +109,8 @@ export function WorkoutsScreen() {
             </View>
             <View style={styles.cardRight}>
               <View style={styles.metaCol}>
-                <Text style={styles.metaEx}>{allExercises(w).length} ex</Text>
-                <Text style={styles.metaMin}>{estimatedDurationMin(w)} min</Text>
+                <Text style={styles.metaEx}>{t('workouts.exShort', { count: allExercises(w).length })}</Text>
+                <Text style={styles.metaMin}>{t('common.minutesShort', { min: estimatedDurationMin(w) })}</Text>
               </View>
               <Pressable hitSlop={8} onPress={() => openMenu(w)}>
                 <Icon name="more" size={18} color={colors.textMuted} />
@@ -144,19 +149,16 @@ export function WorkoutsScreen() {
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <View style={styles.header}>
-            <Text style={styles.title}>Minha Rotina</Text>
+            <Text style={styles.title}>{t('workouts.title')}</Text>
             <Text style={styles.subtitle}>
-              {workouts.length}{' '}
-              {workouts.length === 1 ? 'treino configurado' : 'treinos configurados'}
-              {workouts.length > 1 ? ' · segure para arrastar' : ''}
+              {t('workouts.subtitle', { count: workouts.length })}
+              {workouts.length > 1 ? t('workouts.dragHint') : ''}
             </Text>
           </View>
         }
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Text style={styles.emptyText}>
-              Nenhum treino ainda.{'\n'}Toque no + para criar o primeiro.
-            </Text>
+            <Text style={styles.emptyText}>{t('workouts.empty')}</Text>
           </View>
         }
       />
@@ -178,8 +180,8 @@ export function WorkoutsScreen() {
 
       {/* Seletor animado de tipo de treino */}
       <BottomSheet visible={typeSheet} onClose={() => setTypeSheet(false)}>
-        <Text style={styles.sheetTitle}>Criar treino</Text>
-        <Text style={styles.sheetSubtitle}>Como você quer montar?</Text>
+        <Text style={styles.sheetTitle}>{t('workouts.createTitle')}</Text>
+        <Text style={styles.sheetSubtitle}>{t('workouts.createSubtitle')}</Text>
 
         <Pressable
           style={({ pressed }) => [styles.option, pressed && styles.optionPressed]}
@@ -189,8 +191,8 @@ export function WorkoutsScreen() {
             <Icon name="dumbbell" size={22} color={colors.accent} />
           </View>
           <View style={styles.optionInfo}>
-            <Text style={styles.optionTitle}>Treino simples</Text>
-            <Text style={styles.optionDesc}>Só uma lista de exercícios</Text>
+            <Text style={styles.optionTitle}>{t('workouts.simpleTitle')}</Text>
+            <Text style={styles.optionDesc}>{t('workouts.simpleDesc')}</Text>
           </View>
           <Icon name="chevron-right" size={20} color={colors.textMuted} />
         </Pressable>
@@ -203,8 +205,8 @@ export function WorkoutsScreen() {
             <Icon name="grip" size={22} color={colors.accent} />
           </View>
           <View style={styles.optionInfo}>
-            <Text style={styles.optionTitle}>Treino com grupos</Text>
-            <Text style={styles.optionDesc}>Dividido em seções (Perna, Costas…)</Text>
+            <Text style={styles.optionTitle}>{t('workouts.groupedTitle')}</Text>
+            <Text style={styles.optionDesc}>{t('workouts.groupedDesc')}</Text>
           </View>
           <Icon name="chevron-right" size={20} color={colors.textMuted} />
         </Pressable>
@@ -213,7 +215,7 @@ export function WorkoutsScreen() {
           style={({ pressed }) => [styles.cancel, pressed && styles.optionPressed]}
           onPress={() => setTypeSheet(false)}
         >
-          <Text style={styles.cancelText}>Cancelar</Text>
+          <Text style={styles.cancelText}>{t('common.cancel')}</Text>
         </Pressable>
       </BottomSheet>
 
@@ -223,7 +225,7 @@ export function WorkoutsScreen() {
           {menuWorkout?.name}
         </Text>
         <Text style={styles.sheetSubtitle}>
-          {confirmDelete ? 'Tem certeza que deseja excluir?' : 'O que deseja fazer?'}
+          {confirmDelete ? t('workouts.deleteConfirm') : t('workouts.menuPrompt')}
         </Text>
 
         {confirmDelete ? (
@@ -237,9 +239,9 @@ export function WorkoutsScreen() {
               </View>
               <View style={styles.optionInfo}>
                 <Text style={[styles.optionTitle, { color: colors.danger }]}>
-                  Sim, excluir
+                  {t('workouts.deleteYes')}
                 </Text>
-                <Text style={styles.optionDesc}>Essa ação não pode ser desfeita</Text>
+                <Text style={styles.optionDesc}>{t('workouts.deleteYesDesc')}</Text>
               </View>
             </Pressable>
 
@@ -247,7 +249,7 @@ export function WorkoutsScreen() {
               style={({ pressed }) => [styles.cancel, pressed && styles.optionPressed]}
               onPress={() => setConfirmDelete(false)}
             >
-              <Text style={styles.cancelText}>Voltar</Text>
+              <Text style={styles.cancelText}>{t('common.back')}</Text>
             </Pressable>
           </>
         ) : (
@@ -260,8 +262,8 @@ export function WorkoutsScreen() {
                 <Icon name="timer" size={22} color={colors.accent} />
               </View>
               <View style={styles.optionInfo}>
-                <Text style={styles.optionTitle}>Iniciar treino</Text>
-                <Text style={styles.optionDesc}>Segue a rotação da semana</Text>
+                <Text style={styles.optionTitle}>{t('workouts.startTitle')}</Text>
+                <Text style={styles.optionDesc}>{t('workouts.startDesc')}</Text>
               </View>
               <Icon name="chevron-right" size={20} color={colors.textMuted} />
             </Pressable>
@@ -274,8 +276,8 @@ export function WorkoutsScreen() {
                 <Icon name="edit" size={22} color={colors.accent} />
               </View>
               <View style={styles.optionInfo}>
-                <Text style={styles.optionTitle}>Editar</Text>
-                <Text style={styles.optionDesc}>Alterar nome e exercícios</Text>
+                <Text style={styles.optionTitle}>{t('workouts.editTitle')}</Text>
+                <Text style={styles.optionDesc}>{t('workouts.editDesc')}</Text>
               </View>
               <Icon name="chevron-right" size={20} color={colors.textMuted} />
             </Pressable>
@@ -288,8 +290,8 @@ export function WorkoutsScreen() {
                 <Icon name="trash" size={22} color={colors.danger} />
               </View>
               <View style={styles.optionInfo}>
-                <Text style={[styles.optionTitle, { color: colors.danger }]}>Excluir</Text>
-                <Text style={styles.optionDesc}>Remover este treino</Text>
+                <Text style={[styles.optionTitle, { color: colors.danger }]}>{t('workouts.deleteTitle')}</Text>
+                <Text style={styles.optionDesc}>{t('workouts.deleteDesc')}</Text>
               </View>
               <Icon name="chevron-right" size={20} color={colors.textMuted} />
             </Pressable>
@@ -298,7 +300,7 @@ export function WorkoutsScreen() {
               style={({ pressed }) => [styles.cancel, pressed && styles.optionPressed]}
               onPress={closeMenu}
             >
-              <Text style={styles.cancelText}>Cancelar</Text>
+              <Text style={styles.cancelText}>{t('common.cancel')}</Text>
             </Pressable>
           </>
         )}
@@ -307,7 +309,8 @@ export function WorkoutsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
   // Bottom sheet
   sheetTitle: {
     color: colors.text,

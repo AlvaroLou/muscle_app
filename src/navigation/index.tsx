@@ -1,16 +1,22 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Icon, IconName } from '@/components/Icon';
 import { ActiveWorkoutScreen } from '@/screens/ActiveWorkoutScreen';
+import { CustomExerciseEditorScreen } from '@/screens/CustomExerciseEditorScreen';
 import { DetailsScreen } from '@/screens/DetailsScreen';
 import { CreateScreen } from '@/screens/CreateScreen';
+import { ExerciseDetailScreen } from '@/screens/ExerciseDetailScreen';
+import { ExerciseLibraryScreen } from '@/screens/ExerciseLibraryScreen';
 import { HomeScreen } from '@/screens/HomeScreen';
 import { HistoryScreen } from '@/screens/HistoryScreen';
 import { SessionSummaryScreen } from '@/screens/SessionSummaryScreen';
+import { SettingsScreen } from '@/screens/SettingsScreen';
 import { WorkoutsScreen } from '@/screens/WorkoutsScreen';
-import { colors, fonts } from '@/theme';
+import { fonts } from '@/theme';
+import { useTheme } from '@/theme/ThemeProvider';
 import { RootStackParamList, TabsParamList, WorkoutsStackParamList } from './types';
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
@@ -30,11 +36,13 @@ function WorkoutsNavigator() {
 const TAB_ICONS: Record<keyof TabsParamList, IconName> = {
   Home: 'home',
   Workouts: 'dumbbell',
+  Library: 'book',
   History: 'history',
-  Profile: 'user',
 };
 
 function TabsNavigator() {
+  const { t } = useTranslation();
+  const { colors } = useTheme();
   return (
     <Tabs.Navigator
       screenOptions={({ route }) => ({
@@ -58,14 +66,18 @@ function TabsNavigator() {
         ),
       })}
     >
-      <Tabs.Screen name="Home" component={HomeScreen} options={{ title: 'Home' }} />
+      <Tabs.Screen name="Home" component={HomeScreen} options={{ title: t('tabs.home') }} />
       <Tabs.Screen
         name="Workouts"
         component={WorkoutsNavigator}
-        options={{ title: 'Meus treinos' }}
+        options={{ title: t('tabs.workouts') }}
       />
-      <Tabs.Screen name="History" component={HistoryScreen} options={{ title: 'Histórico' }} />
-      {/* <Tabs.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profile' }} /> */}
+      <Tabs.Screen
+        name="Library"
+        component={ExerciseLibraryScreen}
+        options={{ title: t('tabs.library') }}
+      />
+      <Tabs.Screen name="History" component={HistoryScreen} options={{ title: t('tabs.history') }} />
     </Tabs.Navigator>
   );
 }
@@ -88,6 +100,21 @@ export function RootNavigator() {
       <RootStack.Screen
         name="SessionSummary"
         component={SessionSummaryScreen}
+        options={{ presentation: 'modal' }}
+      />
+      <RootStack.Screen
+        name="Settings"
+        component={SettingsScreen}
+        options={{ presentation: 'modal' }}
+      />
+      <RootStack.Screen
+        name="ExerciseDetail"
+        component={ExerciseDetailScreen}
+        options={{ presentation: 'modal' }}
+      />
+      <RootStack.Screen
+        name="CustomExerciseEditor"
+        component={CustomExerciseEditorScreen}
         options={{ presentation: 'modal' }}
       />
     </RootStack.Navigator>

@@ -26,7 +26,17 @@ export type IconName =
   | 'x'
   | 'check'
   | 'flame'
-  | 'calendar';
+  | 'calendar'
+  | 'settings'
+  | 'globe'
+  | 'search'
+  | 'star'
+  | 'star-filled'
+  | 'heart'
+  | 'copy'
+  | 'filter'
+  | 'info'
+  | 'book';
 
 interface Props {
   name: IconName;
@@ -50,6 +60,15 @@ const FEATHER: Partial<Record<IconName, keyof typeof Feather.glyphMap>> = {
   x: 'x',
   check: 'check',
   calendar: 'calendar',
+  settings: 'settings',
+  globe: 'globe',
+  search: 'search',
+  star: 'star',
+  heart: 'heart',
+  copy: 'copy',
+  filter: 'filter',
+  info: 'info',
+  book: 'book-open',
 };
 
 const MCI: Partial<Record<IconName, keyof typeof MaterialCommunityIcons.glyphMap>> = {
@@ -58,6 +77,7 @@ const MCI: Partial<Record<IconName, keyof typeof MaterialCommunityIcons.glyphMap
   grip: 'drag-vertical',
   timer: 'timer-outline',
   flame: 'fire',
+  'star-filled': 'star',
 };
 
 export function Icon({ name, size = 22, color = '#ffffff' }: Props) {

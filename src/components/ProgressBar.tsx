@@ -1,7 +1,12 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 
-import { colors } from '@/theme';
+import { useTheme } from '@/theme/ThemeProvider';
 
 interface Props {
   /** Progresso de 0 a 1. */
@@ -10,18 +15,36 @@ interface Props {
   height?: number;
 }
 
-/** Barra de progresso simples e reutilizável. */
-export function ProgressBar({ value, color = colors.accent, height = 8 }: Props) {
+/** Barra de progresso reutilizável com preenchimento animado. */
+export function ProgressBar({ value, color, height = 8 }: Props) {
+  const { colors } = useTheme();
   const clamped = Math.max(0, Math.min(1, value));
+  const w = useSharedValue(clamped);
+
+  useEffect(() => {
+    w.value = withTiming(clamped, { duration: 350 });
+  }, [clamped, w]);
+
+  const fillStyle = useAnimatedStyle(() => ({
+    width: `${w.value * 100}%`,
+  }));
+
   return (
-    <View style={[styles.track, { height, borderRadius: height / 2 }]}>
-      <View
-        style={{
-          width: `${clamped * 100}%`,
-          height: '100%',
-          backgroundColor: color,
-          borderRadius: height / 2,
-        }}
+    <View
+      style={[
+        styles.track,
+        { height, borderRadius: height / 2, backgroundColor: colors.inputAlt },
+      ]}
+    >
+      <Animated.View
+        style={[
+          fillStyle,
+          {
+            height: '100%',
+            backgroundColor: color ?? colors.accent,
+            borderRadius: height / 2,
+          },
+        ]}
       />
     </View>
   );
@@ -30,7 +53,6 @@ export function ProgressBar({ value, color = colors.accent, height = 8 }: Props)
 const styles = StyleSheet.create({
   track: {
     width: '100%',
-    backgroundColor: colors.inputAlt,
     overflow: 'hidden',
   },
 });

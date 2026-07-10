@@ -1,7 +1,9 @@
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ConfirmSheet } from '@/components/ConfirmSheet';
@@ -13,7 +15,8 @@ import { DEFAULT_REST_SECONDS, useWorkoutSession } from '@/hooks/useWorkoutSessi
 import { activeSessionRepository } from '@/repositories/activeSessionRepository';
 import { useWorkouts } from '@/store/WorkoutStore';
 import { ActiveSession, Workout } from '@/types';
-import { colors, fonts } from '@/theme';
+import { fonts, ThemeColors } from '@/theme';
+import { useTheme } from '@/theme/ThemeProvider';
 import { formatDuration } from '@/utils/time';
 import { allExercises } from '@/utils/workout';
 import { RootStackParamList } from '@/navigation/types';
@@ -22,6 +25,9 @@ type Nav = NativeStackNavigationProp<RootStackParamList, 'ActiveWorkout'>;
 
 export function ActiveWorkoutScreen() {
   const navigation = useNavigation<Nav>();
+  const { t } = useTranslation();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const route = useRoute<RouteProp<RootStackParamList, 'ActiveWorkout'>>();
   const { getWorkout, activeSession } = useWorkouts();
   const { workoutId, groupId } = route.params;
@@ -50,8 +56,8 @@ export function ActiveWorkoutScreen() {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.center}>
-          <Text style={styles.notFound}>Este treino não tem exercícios.</Text>
-          <GradientButton label="VOLTAR" onPress={() => navigation.goBack()} />
+          <Text style={styles.notFound}>{t('active.noExercises')}</Text>
+          <GradientButton label={t('active.goBack')} onPress={() => navigation.goBack()} />
         </View>
       </SafeAreaView>
     );
@@ -78,6 +84,9 @@ function RunningSession({
   initial?: ActiveSession;
   navigation: Nav;
 }) {
+  const { t } = useTranslation();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { workouts, logSession, saveActiveSession, clearActiveSession } = useWorkouts();
   const session = useWorkoutSession(workout, initial);
   // `seconds` = duração do descanso; `nonce` incrementa a cada série concluída
@@ -107,12 +116,16 @@ function RunningSession({
     currentExerciseIndex,
     currentExerciseSets,
     isLastExercise,
+    exerciseStatus,
     toggleSet,
     nextExercise,
     prevExercise,
+    goToExercise,
     finish,
     finished,
   } = session;
+
+  const pct = Math.round(progress * 100);
 
   const order = useMemo(() => {
     const o = workouts.findIndex((w) => w.id === workout.id);
@@ -219,25 +232,25 @@ function RunningSession({
       <SafeAreaView style={styles.safe}>
         <View style={styles.center}>
           <Text style={styles.summaryEmoji}>🎉</Text>
-          <Text style={styles.summaryTitle}>Treino concluído!</Text>
+          <Text style={styles.summaryTitle}>{t('active.completeTitle')}</Text>
           <Text style={styles.summarySub} numberOfLines={2}>
             {workout.name}
           </Text>
           <View style={styles.summaryCard}>
             <View style={styles.summaryStat}>
               <Text style={styles.summaryValue}>{formatDuration(elapsedMs)}</Text>
-              <Text style={styles.summaryLabel}>Duração total</Text>
+              <Text style={styles.summaryLabel}>{t('active.totalDuration')}</Text>
             </View>
             <View style={styles.summaryDivider} />
             <View style={styles.summaryStat}>
               <Text style={styles.summaryValue}>
                 {completedSets}/{totalSets}
               </Text>
-              <Text style={styles.summaryLabel}>Séries feitas</Text>
+              <Text style={styles.summaryLabel}>{t('summary.setsDone')}</Text>
             </View>
           </View>
           <View style={{ alignSelf: 'stretch', marginTop: 24 }}>
-            <GradientButton label="CONCLUIR" onPress={() => navigation.goBack()} />
+            <GradientButton label={t('active.done')} onPress={() => navigation.goBack()} />
           </View>
         </View>
       </SafeAreaView>
@@ -255,34 +268,78 @@ function RunningSession({
         </Pressable>
         <View style={styles.clockWrap}>
           <Text style={styles.clock}>{formatDuration(elapsedMs)}</Text>
-          <Text style={styles.clockLabel}>duração total</Text>
+          <Text style={styles.clockLabel}>{t('active.totalDurationShort')}</Text>
         </View>
         <Pressable hitSlop={8} onPress={running ? pause : resume}>
           <Icon name={running ? 'timer' : 'timer'} size={22} color={colors.accent} />
-          <Text style={styles.pauseText}>{running ? 'Pausar' : 'Retomar'}</Text>
+          <Text style={styles.pauseText}>{running ? t('active.pause') : t('active.resume')}</Text>
         </Pressable>
       </View>
 
       <View style={styles.progressWrap}>
         <ProgressBar value={progress} />
-        <Text style={styles.progressText}>
-          {completedSets} de {totalSets} séries
-        </Text>
+        <View style={styles.progressMeta}>
+          <Text style={styles.progressPct}>{pct}%</Text>
+          <Text style={styles.progressText}>
+            {t('active.setsOfTotal', { done: completedSets, total: totalSets })}
+          </Text>
+        </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+      {/* Visão geral dos exercícios: destaca concluídos e o atual */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.stepperScroll}
+        contentContainerStyle={styles.stepper}
+      >
+        {exerciseStatus.map((ex) => {
+          const isCurrent = ex.index === currentExerciseIndex;
+          return (
+            <Pressable
+              key={ex.id}
+              onPress={() => goToExercise(ex.index)}
+              style={[
+                styles.step,
+                ex.completed && styles.stepDone,
+                isCurrent && styles.stepCurrent,
+              ]}
+            >
+              {ex.completed ? (
+                <Icon name="check" size={14} color={colors.onAccent} />
+              ) : (
+                <Text style={[styles.stepText, isCurrent && styles.stepTextCurrent]}>
+                  {ex.index + 1}
+                </Text>
+              )}
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+
+      <ScrollView
+        style={styles.bodyScroll}
+        contentContainerStyle={styles.body}
+        showsVerticalScrollIndicator={false}
+      >
+       <Animated.View key={currentExerciseIndex} entering={FadeIn.duration(250)}>
         {currentGroupName ? (
           <Text style={styles.groupName}>{currentGroupName.toUpperCase()}</Text>
         ) : null}
         <Text style={styles.counter}>
-          Exercício {currentExerciseIndex + 1} de {totalExercises}
+          {t('active.exerciseCounter', {
+            current: currentExerciseIndex + 1,
+            total: totalExercises,
+          })}
         </Text>
         <Text style={styles.exerciseName} numberOfLines={2}>
           {currentExercise.name}
         </Text>
         <Text style={styles.exerciseMeta}>
-          {currentExercise.reps} reps
-          {currentExercise.weight > 0 ? ` · ${currentExercise.weight} kg` : ' · peso corporal'}
+          {t('active.reps', { reps: currentExercise.reps })}
+          {currentExercise.weight > 0
+            ? ` · ${t('details.weightKg', { weight: currentExercise.weight })}`
+            : ` · ${t('details.bodyweight')}`}
         </Text>
         {currentExercise.description?.trim() ? (
           <Text style={styles.exerciseDesc}>{currentExercise.description.trim()}</Text>
@@ -301,13 +358,14 @@ function RunningSession({
                   {done ? <Icon name="check" size={16} color={colors.onAccent} /> : null}
                 </View>
                 <Text style={[styles.setLabel, done && styles.setLabelDone]}>
-                  Série {set.setIndex + 1}
+                  {t('active.setLabel', { n: set.setIndex + 1 })}
                 </Text>
-                <Text style={styles.setTarget}>{currentExercise.reps} reps</Text>
+                <Text style={styles.setTarget}>{t('active.reps', { reps: currentExercise.reps })}</Text>
               </Pressable>
             );
           })}
         </View>
+       </Animated.View>
       </ScrollView>
 
       {/* Navegação entre exercícios */}
@@ -317,12 +375,12 @@ function RunningSession({
           disabled={currentExerciseIndex === 0}
           style={[styles.navBtn, currentExerciseIndex === 0 && styles.navBtnDisabled]}
         >
-          <Text style={styles.navBtnText}>Anterior</Text>
+          <Text style={styles.navBtnText}>{t('active.previous')}</Text>
         </Pressable>
         {isLastExercise ? (
-          <GradientButton label="FINALIZAR" onPress={finish} style={styles.navPrimary} />
+          <GradientButton label={t('active.finish')} onPress={finish} style={styles.navPrimary} />
         ) : (
-          <GradientButton label="PRÓXIMO" onPress={nextExercise} style={styles.navPrimary} />
+          <GradientButton label={t('active.next')} onPress={nextExercise} style={styles.navPrimary} />
         )}
       </View>
 
@@ -335,19 +393,20 @@ function RunningSession({
 
       <ConfirmSheet
         visible={quitOpen}
-        title="Sair do treino"
-        message="O treino continua em segundo plano para você retomar."
+        title={t('active.quitTitle')}
+        message={t('active.quitMessage')}
         onClose={() => setQuitOpen(false)}
         actions={[
-          { label: 'Sair (continuar depois)', variant: 'primary', onPress: () => navigation.goBack() },
-          { label: 'Descartar treino', variant: 'danger', onPress: discardWorkout },
+          { label: t('active.quitLeave'), variant: 'primary', onPress: () => navigation.goBack() },
+          { label: t('active.quitDiscard'), variant: 'danger', onPress: discardWorkout },
         ]}
       />
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: colors.bg,
@@ -397,12 +456,61 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginTop: 16,
   },
+  progressMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 6,
+  },
+  progressPct: {
+    color: colors.accent,
+    fontFamily: fonts.bodyBold,
+    fontSize: 12,
+  },
   progressText: {
     color: colors.textSecondary,
     fontFamily: fonts.mono,
     fontSize: 11,
-    marginTop: 6,
     textAlign: 'right',
+  },
+  stepperScroll: {
+    flexGrow: 0,
+    flexShrink: 0,
+  },
+  stepper: {
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    gap: 8,
+    alignItems: 'center',
+  },
+  step: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  stepDone: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
+  },
+  stepCurrent: {
+    borderColor: colors.accent,
+    borderWidth: 2,
+  },
+  stepText: {
+    color: colors.textMuted,
+    fontFamily: fonts.mono,
+    fontSize: 13,
+  },
+  stepTextCurrent: {
+    color: colors.accent,
+  },
+  bodyScroll: {
+    flex: 1,
   },
   body: {
     padding: 20,

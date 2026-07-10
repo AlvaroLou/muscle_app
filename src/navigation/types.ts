@@ -14,8 +14,8 @@ export type WorkoutsStackParamList = {
 export type TabsParamList = {
   Home: undefined;
   Workouts: NavigatorScreenParams<WorkoutsStackParamList>;
+  Library: undefined;
   History: undefined;
-  Profile: undefined;
 };
 
 export type RootStackParamList = {
@@ -23,4 +23,7 @@ export type RootStackParamList = {
   Create: { workoutId?: string; mode?: 'simple' | 'grouped' } | undefined;
   ActiveWorkout: { workoutId: string; groupId?: string };
   SessionSummary: { sessionId: string };
+  Settings: undefined;
+  ExerciseDetail: { exerciseId: string };
+  CustomExerciseEditor: { exerciseId?: string } | undefined;
 };

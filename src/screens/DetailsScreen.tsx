@@ -6,7 +6,8 @@ import {
 } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import {
   NestableDraggableFlatList,
@@ -21,7 +22,8 @@ import { Pill } from '@/components/Pill';
 import { Screen } from '@/components/Screen';
 import { useWorkouts } from '@/store/WorkoutStore';
 import { Exercise, ExerciseGroup } from '@/types';
-import { colors, fonts, gradients } from '@/theme';
+import { fonts, ThemeColors } from '@/theme';
+import { useTheme } from '@/theme/ThemeProvider';
 import { allExercises, estimatedDurationMin, workoutLetter } from '@/utils/workout';
 import { RootStackParamList, WorkoutsStackParamList } from '@/navigation/types';
 
@@ -32,6 +34,9 @@ type Nav = CompositeNavigationProp<
 
 export function DetailsScreen() {
   const navigation = useNavigation<Nav>();
+  const { t } = useTranslation();
+  const { colors, gradients } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const route = useRoute<RouteProp<WorkoutsStackParamList, 'Details'>>();
   const { workouts, reorderGroups, reorderExercises } = useWorkouts();
 
@@ -44,9 +49,9 @@ export function DetailsScreen() {
     return (
       <Screen>
         <View style={styles.notFound}>
-          <Text style={styles.notFoundText}>Treino não encontrado.</Text>
+          <Text style={styles.notFoundText}>{t('details.notFound')}</Text>
           <Pressable onPress={() => navigation.goBack()}>
-            <Text style={styles.backText}>Voltar</Text>
+            <Text style={styles.backText}>{t('common.back')}</Text>
           </Pressable>
         </View>
       </Screen>
@@ -94,7 +99,7 @@ export function DetailsScreen() {
             </Text>
             <View style={styles.exerciseTags}>
               <Pill
-                label={`${ex.sets} Séries × ${ex.reps} Reps`}
+                label={t('details.setsReps', { sets: ex.sets, reps: ex.reps })}
                 color={colors.accent}
                 background={colors.accentTint}
                 borderColor={colors.accentBorder}
@@ -102,7 +107,7 @@ export function DetailsScreen() {
                 textStyle={styles.smallPillText}
               />
               <Pill
-                label={ex.weight > 0 ? `${ex.weight} kg` : 'Peso corporal'}
+                label={ex.weight > 0 ? t('details.weightKg', { weight: ex.weight }) : t('details.bodyweight')}
                 color={colors.textDim2}
                 background={colors.white06}
                 style={styles.smallPill}
@@ -130,7 +135,9 @@ export function DetailsScreen() {
               color={colors.textMuted}
             />
             <Text style={styles.groupLabel} numberOfLines={1}>
-              {grouped ? (group.name.trim() || 'Grupo').toUpperCase() : 'EXERCÍCIOS'}
+              {grouped
+                ? (group.name.trim() || t('details.group')).toUpperCase()
+                : t('details.exercises').toUpperCase()}
             </Text>
             <Text style={styles.groupCount}>{group.exercises.length}</Text>
           </Pressable>
@@ -146,7 +153,7 @@ export function DetailsScreen() {
               }
             >
               <Icon name="timer" size={13} color={colors.accent} />
-              <Text style={styles.groupStartText}>Iniciar</Text>
+              <Text style={styles.groupStartText}>{t('common.start')}</Text>
             </Pressable>
           ) : null}
         </View>
@@ -168,16 +175,16 @@ export function DetailsScreen() {
       <View style={styles.topBar}>
         <Pressable style={styles.back} hitSlop={8} onPress={() => navigation.goBack()}>
           <Icon name="chevron-left" size={22} color={colors.accent} />
-          <Text style={styles.backText}>Voltar</Text>
+          <Text style={styles.backText}>{t('common.back')}</Text>
         </Pressable>
         <View style={styles.titleWrap}>
-          <Text style={styles.tag}>TREINO {letter}</Text>
+          <Text style={styles.tag}>{t('details.workoutTag', { letter })}</Text>
           <Text style={styles.title} numberOfLines={1}>
             {workout.name}
           </Text>
         </View>
         <Pressable hitSlop={8} onPress={() => navigation.navigate('Create', { workoutId: workout.id })}>
-          <Text style={styles.edit}>Editar</Text>
+          <Text style={styles.edit}>{t('common.edit')}</Text>
         </Pressable>
       </View>
 
@@ -189,21 +196,18 @@ export function DetailsScreen() {
         <View style={styles.infoRow}>
           <View style={styles.infoPill}>
             <Icon name="timer" size={13} color={colors.accent} />
-            <Text style={styles.infoText}>{estimatedDurationMin(workout)} min</Text>
+            <Text style={styles.infoText}>{t('common.minutesShort', { min: estimatedDurationMin(workout) })}</Text>
           </View>
           <View style={styles.infoPill}>
             <Icon name="dumbbell" size={13} color={colors.accent} />
             <Text style={styles.infoText}>
-              {allExercises(workout).length}{' '}
-              {allExercises(workout).length === 1 ? 'exercício' : 'exercícios'}
+              {t('details.exCount', { count: allExercises(workout).length })}
             </Text>
           </View>
         </View>
 
         {allExercises(workout).length === 0 ? (
-          <Text style={styles.emptyText}>
-            Nenhum exercício. Toque em Editar para adicionar.
-          </Text>
+          <Text style={styles.emptyText}>{t('details.empty')}</Text>
         ) : (
           <NestableDraggableFlatList
             data={workout.groups}
@@ -217,7 +221,7 @@ export function DetailsScreen() {
       {/* Fixed bottom button */}
       <View style={styles.footer}>
         <GradientButton
-          label={grouped ? 'INICIAR TREINO COMPLETO' : 'INICIAR TREINO'}
+          label={grouped ? t('details.startFull') : t('details.startWorkout')}
           icon="timer"
           onPress={() => navigation.navigate('ActiveWorkout', { workoutId: workout.id })}
         />
@@ -226,7 +230,8 @@ export function DetailsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
   notFound: {
     flex: 1,
     alignItems: 'center',

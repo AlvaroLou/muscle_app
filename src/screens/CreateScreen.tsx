@@ -1,10 +1,12 @@
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React, { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -17,13 +19,17 @@ import {
   ScaleDecorator,
 } from 'react-native-draggable-flatlist';
 
+import { BottomSheet } from '@/components/BottomSheet';
 import { ConfirmSheet } from '@/components/ConfirmSheet';
 import { FocusInput } from '@/components/FocusInput';
 import { Icon } from '@/components/Icon';
 import { Screen } from '@/components/Screen';
+import { useExerciseLibrary } from '@/store/ExerciseLibraryStore';
 import { useWorkouts } from '@/store/WorkoutStore';
-import { EditExercise, EditGroup } from '@/types';
-import { colors, fonts } from '@/theme';
+import { EditExercise, EditGroup, LibraryExercise } from '@/types';
+import { fonts, ThemeColors } from '@/theme';
+import { useTheme } from '@/theme/ThemeProvider';
+import { exerciseName } from '@/utils/exerciseText';
 import { createId } from '@/utils/id';
 import { fromEditGroups, toEditGroups } from '@/utils/workout';
 import { RootStackParamList } from '@/navigation/types';
@@ -34,12 +40,17 @@ type Nav = NativeStackNavigationProp<RootStackParamList, 'Create'>;
 type DraftExercise = EditExercise & { key: string };
 type DraftGroup = { key: string; name: string; exercises: DraftExercise[] };
 
-const NUMERIC_FIELDS: { label: string; field: keyof EditExercise; placeholder?: string }[] = [
-  { label: 'Séries', field: 'sets' },
-  { label: 'Reps', field: 'reps' },
-  { label: 'Peso(kg)', field: 'weight' },
-  { label: 'Descanso(s)', field: 'rest', placeholder: '90' },
-  { label: 'Descrição', field: 'description', placeholder: 'Ex.: Segurar 1 segundo no pico da contração...' },
+const NUMERIC_FIELDS: {
+  labelKey: string;
+  field: keyof EditExercise;
+  placeholder?: string;
+  placeholderKey?: string;
+}[] = [
+  { labelKey: 'create.fieldSets', field: 'sets' },
+  { labelKey: 'create.fieldReps', field: 'reps' },
+  { labelKey: 'create.fieldWeight', field: 'weight' },
+  { labelKey: 'create.fieldRest', field: 'rest', placeholder: '90' },
+  { labelKey: 'create.fieldDescription', field: 'description', placeholderKey: 'create.descPlaceholder' },
 ];
 const firstRow = NUMERIC_FIELDS.slice(0, 4);
 const secondRow = NUMERIC_FIELDS.slice(4);
@@ -78,8 +89,12 @@ function stripKeys(groups: DraftGroup[]): EditGroup[] {
 
 export function CreateScreen() {
   const navigation = useNavigation<Nav>();
+  const { t } = useTranslation();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const route = useRoute<RouteProp<RootStackParamList, 'Create'>>();
   const { getWorkout, createWorkout, updateWorkout } = useWorkouts();
+  const { exercises: libraryExercises } = useExerciseLibrary();
 
   const workoutId = route.params?.workoutId;
   const existing = useMemo(
@@ -98,6 +113,19 @@ export function CreateScreen() {
     existing ? withKeys(toEditGroups(existing)) : [emptyGroup()],
   );
   const [warning, setWarning] = useState<{ title: string; message: string } | null>(null);
+
+  // Picker da Biblioteca: chave do grupo que está adicionando (null = fechado).
+  const [pickerGroupKey, setPickerGroupKey] = useState<string | null>(null);
+  const [pickerQuery, setPickerQuery] = useState('');
+
+  // Grupos recolhidos (por chave) — só UI, fora do modelo salvo.
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const toggleCollapse = (key: string) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
 
   // ---- operações de grupo (por chave) ----
   const addGroup = () => setGroups((prev) => [...prev, emptyGroup()]);
@@ -136,14 +164,49 @@ export function CreateScreen() {
   const reorderExercisesLocal = (gKey: string, ordered: DraftExercise[]) =>
     setGroups((prev) => prev.map((g) => (g.key === gKey ? { ...g, exercises: ordered } : g)));
 
+  // Adiciona um exercício da Biblioteca ao grupo (pré-preenche nome + vínculo).
+  const addFromLibrary = (gKey: string, lib: LibraryExercise) => {
+    const draft: DraftExercise = {
+      ...emptyExercise(),
+      name: exerciseName(lib, t),
+      libraryId: lib.id,
+      muscleGroup: lib.muscleGroup,
+    };
+    setGroups((prev) =>
+      prev.map((g) => (g.key === gKey ? { ...g, exercises: [...g.exercises, draft] } : g)),
+    );
+    setPickerGroupKey(null);
+    setPickerQuery('');
+  };
+
+  // Lista filtrada para o picker.
+  const pickerResults = useMemo(() => {
+    const q = pickerQuery.trim().toLowerCase();
+    return libraryExercises.filter(
+      (ex) => !q || exerciseName(ex, t).toLowerCase().includes(q),
+    );
+  }, [libraryExercises, pickerQuery, t]);
+
   const renderAddExercise = (gKey: string) => (
-    <Pressable
-      onPress={() => addExercise(gKey)}
-      style={({ pressed }) => [styles.addExerciseBtn, pressed && styles.pressed]}
-    >
-      <Icon name="plus" size={16} color={colors.accent} />
-      <Text style={styles.addExerciseText}>Adicionar exercício</Text>
-    </Pressable>
+    <View style={styles.addRow}>
+      <Pressable
+        onPress={() => {
+          setPickerQuery('');
+          setPickerGroupKey(gKey);
+        }}
+        style={({ pressed }) => [styles.addExerciseBtn, styles.addFromLib, pressed && styles.pressed]}
+      >
+        <Icon name="book" size={16} color={colors.accent} />
+        <Text style={styles.addExerciseText}>{t('library.addToWorkout')}</Text>
+      </Pressable>
+      <Pressable
+        onPress={() => addExercise(gKey)}
+        style={({ pressed }) => [styles.addExerciseBtn, pressed && styles.pressed]}
+      >
+        <Icon name="plus" size={16} color={colors.accent} />
+        <Text style={styles.addExerciseText}>{t('create.addExercise')}</Text>
+      </Pressable>
+    </View>
   );
 
   const renderExerciseItem =
@@ -157,8 +220,8 @@ export function CreateScreen() {
             </Pressable>
             <TextInput
               value={ex.name}
-              onChangeText={(t) => updateExercise(gKey, ex.key, 'name', t)}
-              placeholder="Nome do exercício"
+              onChangeText={(text) => updateExercise(gKey, ex.key, 'name', text)}
+              placeholder={t('create.exerciseNamePlaceholder')}
               placeholderTextColor={colors.textMuted}
               selectionColor={colors.accent}
               style={styles.exerciseNameInput}
@@ -168,15 +231,15 @@ export function CreateScreen() {
             </Pressable>
           </View>
           <View style={styles.numericRow}>
-            {firstRow.map(({ label, field, placeholder }) => (
+            {firstRow.map(({ labelKey, field, placeholder, placeholderKey }) => (
               <View key={field} style={styles.numericCol}>
-                <Text style={styles.numericLabel}>{label.toUpperCase()}</Text>
+                <Text style={styles.numericLabel}>{t(labelKey).toUpperCase()}</Text>
                 <FocusInput
                   value={ex[field]}
-                  onChangeText={(t) => updateExercise(gKey, ex.key, field, t)}
-                  placeholder={placeholder ?? '—'}
+                  onChangeText={(text) => updateExercise(gKey, ex.key, field, text)}
+                  placeholder={placeholderKey ? t(placeholderKey) : (placeholder ?? '—')}
                   keyboardType="numeric"
-                  focusBorderColor="rgba(255, 20, 235, 0.4)"
+                  focusBorderColor={colors.accentBorderStrong}
                   baseBorderColor={colors.borderStrong}
                   inputStyle={styles.numericInput}
                 />
@@ -184,18 +247,18 @@ export function CreateScreen() {
             ))}
           </View>
           <View style={styles.numericRow}>
-            {secondRow.map(({ label, field, placeholder }) => (
+            {secondRow.map(({ labelKey, field, placeholder, placeholderKey }) => (
               <View key={field} style={styles.numericCol}>
-                <Text style={styles.numericLabel}>{label.toUpperCase()}</Text>
+                <Text style={styles.numericLabel}>{t(labelKey).toUpperCase()}</Text>
                 <FocusInput
                   value={ex[field]}
-                  onChangeText={(t) => updateExercise(gKey, ex.key, field, t)}
-                  placeholder={placeholder ?? '—'}
+                  onChangeText={(text) => updateExercise(gKey, ex.key, field, text)}
+                  placeholder={placeholderKey ? t(placeholderKey) : (placeholder ?? '—')}
                   multiline
                   numberOfLines={5}
                   textAlignVertical="top"
                   keyboardType="ascii-capable"
-                  focusBorderColor="rgba(255, 20, 235, 0.4)"
+                  focusBorderColor={colors.accentBorderStrong}
                   baseBorderColor={colors.borderStrong}
                   inputStyle={styles.descriptionInput}
                 />
@@ -211,44 +274,69 @@ export function CreateScreen() {
     drag,
     isActive,
     getIndex,
-  }: RenderItemParams<DraftGroup>) => (
-    <ScaleDecorator>
-      <View style={[styles.groupCard, isActive && styles.cardActive]}>
-        <View style={styles.groupHeader}>
-          <Pressable hitSlop={8} onPressIn={drag} onLongPress={drag} style={styles.dragHandle}>
-            <Icon name="grip" size={18} color={colors.textMuted} />
-          </Pressable>
-          <View style={styles.groupBadge}>
-            <Text style={styles.groupBadgeText}>{(getIndex() ?? 0) + 1}</Text>
+  }: RenderItemParams<DraftGroup>) => {
+    const isCollapsed = collapsed.has(group.key);
+    return (
+      <ScaleDecorator>
+        <View style={[styles.groupCard, isActive && styles.cardActive]}>
+          <View style={styles.groupHeader}>
+            <Pressable hitSlop={8} onPressIn={drag} onLongPress={drag} style={styles.dragHandle}>
+              <Icon name="grip" size={18} color={colors.textMuted} />
+            </Pressable>
+            <View style={styles.groupBadge}>
+              <Text style={styles.groupBadgeText}>{(getIndex() ?? 0) + 1}</Text>
+            </View>
+            <TextInput
+              value={group.name}
+              onChangeText={(text) => updateGroupName(group.key, text)}
+              placeholder={t('create.groupNamePlaceholder')}
+              placeholderTextColor={colors.textMuted}
+              selectionColor={colors.accent}
+              style={styles.groupNameInput}
+            />
+            <Pressable
+              hitSlop={8}
+              onPress={() => toggleCollapse(group.key)}
+              style={styles.groupToggle}
+            >
+              <Icon
+                name={isCollapsed ? 'chevron-right' : 'chevron-down'}
+                size={20}
+                color={colors.textMuted}
+              />
+            </Pressable>
+            <Pressable hitSlop={8} onPress={() => removeGroup(group.key)}>
+              <Icon name="trash" size={18} color={colors.danger} />
+            </Pressable>
           </View>
-          <TextInput
-            value={group.name}
-            onChangeText={(t) => updateGroupName(group.key, t)}
-            placeholder="Nome do grupo (ex.: Perna)"
-            placeholderTextColor={colors.textMuted}
-            selectionColor={colors.accent}
-            style={styles.groupNameInput}
-          />
-          <Pressable hitSlop={8} onPress={() => removeGroup(group.key)}>
-            <Icon name="trash" size={18} color={colors.danger} />
-          </Pressable>
-        </View>
 
-        <NestableDraggableFlatList
-          data={group.exercises}
-          keyExtractor={(e) => e.key}
-          onDragEnd={({ data }) => reorderExercisesLocal(group.key, data)}
-          renderItem={renderExerciseItem(group.key)}
-          ListFooterComponent={renderAddExercise(group.key)}
-        />
-      </View>
-    </ScaleDecorator>
-  );
+          {isCollapsed ? (
+            <Pressable onPress={() => toggleCollapse(group.key)}>
+              <Text style={styles.collapsedSummary}>
+                {t('common.exercisesCount', { count: group.exercises.length })}
+              </Text>
+            </Pressable>
+          ) : (
+            <NestableDraggableFlatList
+              data={group.exercises}
+              keyExtractor={(e) => e.key}
+              onDragEnd={({ data }) => reorderExercisesLocal(group.key, data)}
+              renderItem={renderExerciseItem(group.key)}
+              ListFooterComponent={renderAddExercise(group.key)}
+            />
+          )}
+        </View>
+      </ScaleDecorator>
+    );
+  };
 
   const save = () => {
     const name = workoutName.trim();
     if (name.length === 0) {
-      setWarning({ title: 'Nome obrigatório', message: 'Dê um nome ao treino antes de salvar.' });
+      setWarning({
+        title: t('create.nameRequiredTitle'),
+        message: t('create.nameRequiredMessage'),
+      });
       return;
     }
     if (grouped) {
@@ -257,8 +345,8 @@ export function CreateScreen() {
       );
       if (semNome) {
         setWarning({
-          title: 'Nome do grupo obrigatório',
-          message: 'Dê um nome a cada grupo (ex.: Perna, Costas) para separar o treino.',
+          title: t('create.groupNameRequiredTitle'),
+          message: t('create.groupNameRequiredMessage'),
         });
         return;
       }
@@ -279,11 +367,11 @@ export function CreateScreen() {
       {/* Top bar */}
       <View style={styles.topBar}>
         <Pressable hitSlop={8} onPress={close}>
-          <Text style={styles.cancel}>Cancelar</Text>
+          <Text style={styles.cancel}>{t('common.cancel')}</Text>
         </Pressable>
-        <Text style={styles.title}>{isEditing ? 'Editar Treino' : 'Novo Treino'}</Text>
+        <Text style={styles.title}>{isEditing ? t('create.editTitle') : t('create.newTitle')}</Text>
         <Pressable hitSlop={8} onPress={save}>
-          <Text style={styles.save}>Salvar</Text>
+          <Text style={styles.save}>{t('common.save')}</Text>
         </Pressable>
       </View>
 
@@ -298,11 +386,11 @@ export function CreateScreen() {
         >
           {/* Workout name */}
           <View style={styles.block}>
-            <Text style={styles.fieldLabel}>NOME DO TREINO</Text>
+            <Text style={styles.fieldLabel}>{t('create.workoutNameLabel')}</Text>
             <FocusInput
               value={workoutName}
               onChangeText={setWorkoutName}
-              placeholder="ex.: Treino A"
+              placeholder={t('create.workoutNamePlaceholder')}
               inputStyle={styles.nameInput}
             />
           </View>
@@ -320,12 +408,12 @@ export function CreateScreen() {
                 style={({ pressed }) => [styles.addGroupBtn, pressed && styles.pressed]}
               >
                 <Icon name="plus" size={18} color={colors.accent} />
-                <Text style={styles.addGroupText}>Adicionar grupo</Text>
+                <Text style={styles.addGroupText}>{t('create.addGroup')}</Text>
               </Pressable>
             </>
           ) : (
             <View style={styles.block}>
-              <Text style={styles.fieldLabel}>EXERCÍCIOS</Text>
+              <Text style={styles.fieldLabel}>{t('details.exercises').toUpperCase()}</Text>
               <NestableDraggableFlatList
                 data={groups[0]?.exercises ?? []}
                 keyExtractor={(e) => e.key}
@@ -345,14 +433,49 @@ export function CreateScreen() {
         title={warning?.title ?? ''}
         message={warning?.message}
         actions={[]}
-        cancelLabel="Entendi"
+        cancelLabel={t('common.gotIt')}
         onClose={() => setWarning(null)}
       />
+
+      {/* Picker da Biblioteca de Exercícios */}
+      <BottomSheet visible={pickerGroupKey !== null} onClose={() => setPickerGroupKey(null)}>
+        <Text style={styles.pickerTitle}>{t('library.title')}</Text>
+        <View style={styles.pickerSearch}>
+          <Icon name="search" size={16} color={colors.textMuted} />
+          <TextInput
+            value={pickerQuery}
+            onChangeText={setPickerQuery}
+            placeholder={t('library.searchPlaceholder')}
+            placeholderTextColor={colors.textMuted}
+            selectionColor={colors.accent}
+            style={styles.pickerSearchInput}
+          />
+        </View>
+        <ScrollView style={styles.pickerList} keyboardShouldPersistTaps="handled">
+          {pickerResults.length === 0 ? (
+            <Text style={styles.pickerEmpty}>{t('library.noResults')}</Text>
+          ) : (
+            pickerResults.map((ex) => (
+              <Pressable
+                key={ex.id}
+                onPress={() => pickerGroupKey && addFromLibrary(pickerGroupKey, ex)}
+                style={({ pressed }) => [styles.pickerRow, pressed && styles.pressed]}
+              >
+                <Text style={styles.pickerRowName} numberOfLines={1}>
+                  {exerciseName(ex, t)}
+                </Text>
+                <Text style={styles.pickerRowMeta}>{t(`muscleGroups.${ex.muscleGroup}`)}</Text>
+              </Pressable>
+            ))
+          )}
+        </ScrollView>
+      </BottomSheet>
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -447,6 +570,16 @@ const styles = StyleSheet.create({
     fontSize: 18,
     paddingVertical: 2,
   },
+  groupToggle: {
+    paddingHorizontal: 2,
+  },
+  collapsedSummary: {
+    color: colors.textSecondary,
+    fontFamily: fonts.body,
+    fontSize: 13,
+    paddingVertical: 6,
+    paddingLeft: 4,
+  },
   // Exercício
   exerciseCard: {
     backgroundColor: colors.bg,
@@ -503,7 +636,12 @@ const styles = StyleSheet.create({
     minHeight: 100,
     textAlignVertical: 'top',
   },
+  addRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
   addExerciseBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -512,10 +650,65 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: colors.accentTintSofter,
   },
+  addFromLib: {
+    borderWidth: 1,
+    borderColor: colors.accentBorder,
+  },
   addExerciseText: {
     color: colors.accent,
     fontFamily: fonts.bodyMed,
     fontSize: 13,
+  },
+  pickerTitle: {
+    color: colors.text,
+    fontFamily: fonts.heading,
+    fontSize: 22,
+    marginBottom: 12,
+  },
+  pickerSearch: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: colors.bg,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    marginBottom: 12,
+  },
+  pickerSearchInput: {
+    flex: 1,
+    color: colors.text,
+    fontFamily: fonts.body,
+    fontSize: 15,
+    padding: 0,
+  },
+  pickerList: {
+    maxHeight: 360,
+  },
+  pickerEmpty: {
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 14,
+    textAlign: 'center',
+    paddingVertical: 24,
+  },
+  pickerRow: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.divider,
+  },
+  pickerRowName: {
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 15,
+  },
+  pickerRowMeta: {
+    color: colors.textSecondary,
+    fontFamily: fonts.body,
+    fontSize: 12,
+    marginTop: 2,
   },
   addGroupBtn: {
     flexDirection: 'row',

@@ -1,14 +1,16 @@
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { CompositeNavigationProp, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { ConfirmSheet } from '@/components/ConfirmSheet';
 import { Icon } from '@/components/Icon';
 import { Screen } from '@/components/Screen';
 import { useWorkouts } from '@/store/WorkoutStore';
-import { colors, fonts } from '@/theme';
+import { fonts, ThemeColors } from '@/theme';
+import { useTheme } from '@/theme/ThemeProvider';
 import { relativeDay } from '@/utils/date';
 import { formatDuration } from '@/utils/time';
 import { workoutLetter } from '@/utils/workout';
@@ -21,6 +23,9 @@ type Nav = CompositeNavigationProp<
 
 export function HistoryScreen() {
   const navigation = useNavigation<Nav>();
+  const { t } = useTranslation();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { sessions, clearSessions } = useWorkouts();
   const [clearOpen, setClearOpen] = useState(false);
 
@@ -28,14 +33,14 @@ export function HistoryScreen() {
     <Screen>
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.title}>Histórico</Text>
+          <Text style={styles.title}>{t('history.title')}</Text>
           <Text style={styles.subtitle}>
-            {sessions.length} {sessions.length === 1 ? 'sessão concluída' : 'sessões concluídas'}
+            {t('history.count', { count: sessions.length })}
           </Text>
         </View>
         {sessions.length > 0 ? (
           <Pressable hitSlop={8} onPress={() => setClearOpen(true)}>
-            <Text style={styles.clearText}>Limpar</Text>
+            <Text style={styles.clearText}>{t('common.clear')}</Text>
           </Pressable>
         ) : null}
       </View>
@@ -43,9 +48,7 @@ export function HistoryScreen() {
       {sessions.length === 0 ? (
         <View style={styles.empty}>
           <Icon name="history" size={22} color={colors.textMuted} />
-          <Text style={styles.emptyText}>
-            Nenhuma sessão ainda.{'\n'}Finalize um treino para começar seu histórico.
-          </Text>
+          <Text style={styles.emptyText}>{t('history.empty')}</Text>
         </View>
       ) : (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.list}>
@@ -63,7 +66,8 @@ export function HistoryScreen() {
                   {s.workoutName}
                 </Text>
                 <Text style={styles.meta}>
-                  {relativeDay(s.completedAt)} · {s.completedSets}/{s.totalSets} séries
+                  {relativeDay(s.completedAt)} ·{' '}
+                  {t('common.setsProgress', { done: s.completedSets, total: s.totalSets })}
                 </Text>
               </View>
               <Text style={styles.duration}>{formatDuration(s.durationMs)}</Text>
@@ -75,16 +79,17 @@ export function HistoryScreen() {
 
       <ConfirmSheet
         visible={clearOpen}
-        title="Limpar histórico"
-        message="Remover todas as sessões? Isso não afeta seus treinos."
+        title={t('history.clearTitle')}
+        message={t('history.clearMessage')}
         onClose={() => setClearOpen(false)}
-        actions={[{ label: 'Limpar histórico', variant: 'danger', onPress: clearSessions }]}
+        actions={[{ label: t('history.clearTitle'), variant: 'danger', onPress: clearSessions }]}
       />
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',

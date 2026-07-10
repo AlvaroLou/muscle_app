@@ -94,6 +94,34 @@ export function useWorkoutSession(workout: Workout, initial?: ActiveSession) {
     () => setCurrentExerciseIndex((i) => Math.max(i - 1, 0)),
     [],
   );
+  const goToExercise = useCallback(
+    (index: number) =>
+      setCurrentExerciseIndex(Math.max(0, Math.min(index, items.length - 1))),
+    [items.length],
+  );
+
+  /**
+   * Estado por exercício (para a visão geral): um exercício está concluído
+   * quando todas as suas séries foram marcadas.
+   */
+  const exerciseStatus = useMemo(
+    () =>
+      items.map(({ exercise, groupName }, index) => {
+        const exSets = sets.filter((s) => s.exerciseId === exercise.id);
+        const done = exSets.filter((s) => s.completed).length;
+        return {
+          id: exercise.id,
+          name: exercise.name,
+          groupName,
+          index,
+          totalSets: exSets.length,
+          completedSets: done,
+          completed: exSets.length > 0 && done === exSets.length,
+        };
+      }),
+    [items, sets],
+  );
+  const completedExercises = exerciseStatus.filter((e) => e.completed).length;
 
   const finish = useCallback(() => {
     stopwatch.pause();
@@ -122,9 +150,12 @@ export function useWorkoutSession(workout: Workout, initial?: ActiveSession) {
     currentExerciseIndex,
     currentExerciseSets,
     isLastExercise,
+    exerciseStatus,
+    completedExercises,
     toggleSet,
     nextExercise,
     prevExercise,
+    goToExercise,
     finish,
     finished,
   };

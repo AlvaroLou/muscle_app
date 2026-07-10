@@ -16,23 +16,35 @@ import { ActivityIndicator, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import '@/i18n';
 import { RootNavigator } from '@/navigation';
+import { ExerciseLibraryProvider } from '@/store/ExerciseLibraryStore';
+import { PreferencesProvider } from '@/store/PreferencesStore';
 import { WorkoutProvider } from '@/store/WorkoutStore';
+import { ThemeProvider, useTheme } from '@/theme/ThemeProvider';
 import { colors } from '@/theme';
 
-// Tema escuro do React Navigation alinhado ao design (fundo #121212).
-const navTheme = {
-  ...DarkTheme,
-  colors: {
-    ...DarkTheme.colors,
-    background: colors.bg,
-    card: colors.bg,
-    text: colors.text,
-    border: colors.border,
-    primary: colors.accent,
-    notification: colors.danger,
-  },
-};
+// Container de navegação com o tema (accent) reativo ao preset ativo.
+function ThemedNavigation() {
+  const { colors: c } = useTheme();
+  const navTheme = {
+    ...DarkTheme,
+    colors: {
+      ...DarkTheme.colors,
+      background: c.bg,
+      card: c.bg,
+      text: c.text,
+      border: c.border,
+      primary: c.accent,
+      notification: c.danger,
+    },
+  };
+  return (
+    <NavigationContainer theme={navTheme}>
+      <RootNavigator />
+    </NavigationContainer>
+  );
+}
 
 export default function App() {
   const [fontsLoaded, fontError] = useFonts({
@@ -57,12 +69,16 @@ export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <WorkoutProvider>
-          <NavigationContainer theme={navTheme}>
-            <RootNavigator />
-          </NavigationContainer>
-          <StatusBar style="light" />
-        </WorkoutProvider>
+        <PreferencesProvider>
+          <ThemeProvider>
+            <ExerciseLibraryProvider>
+              <WorkoutProvider>
+                <ThemedNavigation />
+                <StatusBar style="light" />
+              </WorkoutProvider>
+            </ExerciseLibraryProvider>
+          </ThemeProvider>
+        </PreferencesProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

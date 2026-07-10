@@ -2,7 +2,8 @@ import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { CompositeNavigationProp, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
-import React from 'react';
+import React, { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { ConfirmSheet } from '@/components/ConfirmSheet';
@@ -11,7 +12,8 @@ import { Icon } from '@/components/Icon';
 import { Pill } from '@/components/Pill';
 import { Screen } from '@/components/Screen';
 import { useWorkouts } from '@/store/WorkoutStore';
-import { colors, fonts, gradients } from '@/theme';
+import { fonts, ThemeColors } from '@/theme';
+import { useTheme } from '@/theme/ThemeProvider';
 import { currentWeek, dayKey, headerDate, relativeDay } from '@/utils/date';
 import {
   allExercises,
@@ -30,6 +32,9 @@ type Nav = CompositeNavigationProp<
 
 export function HomeScreen() {
   const navigation = useNavigation<Nav>();
+  const { t } = useTranslation();
+  const { colors, gradients } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { workouts, sessions, activeSession, clearSessions } = useWorkouts();
 
   // Próximo treino da rotação (A→B→C→A) a partir do último concluído.
@@ -46,9 +51,9 @@ export function HomeScreen() {
   // Estatísticas reais derivadas do store (nada fictício).
   const totalExercises = workouts.reduce((s, w) => s + allExercises(w).length, 0);
   const stats = [
-    { label: 'Treinos', value: String(workouts.length), unit: 'criados' },
-    { label: 'Exercícios', value: String(totalExercises), unit: 'no total' },
-    { label: 'Sessões', value: String(sessions.length), unit: 'concluídas' },
+    { label: t('home.statWorkouts'), value: String(workouts.length), unit: t('home.statWorkoutsSub') },
+    { label: t('home.statExercises'), value: String(totalExercises), unit: t('home.statExercisesSub') },
+    { label: t('home.statSessions'), value: String(sessions.length), unit: t('home.statSessionsSub') },
   ];
 
   const startWorkout = () => {
@@ -89,18 +94,27 @@ export function HomeScreen() {
           <View style={{ flex: 1 }}>
             <Text style={styles.date}>{headerDate()}</Text>
             <Text style={styles.hello}>
-              Olá, Campeão! 👊{'\n'}
-              <Text style={{ color: colors.accent }}>Pronto pra hoje?</Text>
+              {t('home.greeting')}{'\n'}
+              <Text style={{ color: colors.accent }}>{t('home.greetingSub')}</Text>
             </Text>
           </View>
-          <LinearGradient
-            colors={gradients.accentAvatar}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.avatar}
-          >
-            <Text style={styles.avatarText}>AL</Text>
-          </LinearGradient>
+          <View style={styles.topActions}>
+            <Pressable
+              hitSlop={8}
+              onPress={() => navigation.navigate('Settings')}
+              style={({ pressed }) => [styles.settingsBtn, pressed && { opacity: 0.6 }]}
+            >
+              <Icon name="settings" size={22} color={colors.textDim} />
+            </Pressable>
+            <LinearGradient
+              colors={gradients.accentAvatar}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.avatar}
+            >
+              <Icon name="dumbbell" size={22} color={colors.onAccent} />
+            </LinearGradient>
+          </View>
         </View>
 
         {/* Treino em andamento (retomar) */}
@@ -114,12 +128,12 @@ export function HomeScreen() {
                 <Icon name="timer" size={20} color={colors.accent} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.resumeLabel}>TREINO EM ANDAMENTO</Text>
+                <Text style={styles.resumeLabel}>{t('home.inProgress')}</Text>
                 <Text style={styles.resumeName} numberOfLines={1}>
                   {activeSession.workoutName}
                 </Text>
               </View>
-              <Text style={styles.resumeCta}>Retomar</Text>
+              <Text style={styles.resumeCta}>{t('home.resume')}</Text>
             </Pressable>
           </View>
         ) : null}
@@ -129,7 +143,7 @@ export function HomeScreen() {
           <View style={styles.trackerCard}>
             <View style={styles.trackerHeader}>
               <Icon name="calendar" size={14} color={colors.textSecondary} />
-              <Text style={styles.trackerLabel}>SEMANA ATUAL</Text>
+              <Text style={styles.trackerLabel}>{t('home.currentWeek')}</Text>
             </View>
             <View style={styles.daysRow}>
               {week.map((d, i) => (
@@ -190,7 +204,7 @@ export function HomeScreen() {
 
         {/* Today's Workout */}
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>TREINO DE HOJE</Text>
+          <Text style={styles.sectionLabel}>{t('home.todayWorkout')}</Text>
           <View style={styles.todayCard}>
             <LinearGradient
               colors={gradients.accent}
@@ -217,24 +231,24 @@ export function HomeScreen() {
                     </View>
                     <View style={styles.pillRow}>
                       <Pill
-                        label={`${estimatedDurationMin(today)} min`}
+                        label={t('common.minutesShort', { min: estimatedDurationMin(today) })}
                         color={colors.textDim}
                         background={colors.white07}
                       />
                       <Pill
-                        label={`${allExercises(today).length} exercícios`}
+                        label={t('common.exercisesCount', { count: allExercises(today).length })}
                         color={colors.textDim}
                         background={colors.white07}
                       />
                     </View>
                   </Pressable>
-                  <GradientButton label="INICIAR TREINO" onPress={startWorkout} />
+                  <GradientButton label={t('home.startWorkout')} onPress={startWorkout} />
                 </>
               ) : (
                 <>
-                  <Text style={styles.todayTitle}>Sem treinos ainda</Text>
+                  <Text style={styles.todayTitle}>{t('home.noWorkoutsYet')}</Text>
                   <View style={{ height: 12 }} />
-                  <GradientButton label="CRIAR TREINO" onPress={startWorkout} />
+                  <GradientButton label={t('home.createWorkout')} onPress={startWorkout} />
                 </>
               )}
             </View>
@@ -244,10 +258,10 @@ export function HomeScreen() {
         {/* Recent */}
         <View style={styles.section}>
           <View style={styles.recentHeader}>
-            <Text style={styles.sectionLabel}>RECENTES</Text>
+            <Text style={styles.sectionLabel}>{t('home.recent')}</Text>
             {sessions.length > 0 ? (
               <Pressable hitSlop={8} onPress={() => setClearOpen(true)}>
-                <Text style={styles.clearText}>Limpar</Text>
+                <Text style={styles.clearText}>{t('common.clear')}</Text>
               </Pressable>
             ) : null}
           </View>
@@ -255,7 +269,7 @@ export function HomeScreen() {
             <View style={styles.recentEmpty}>
               <Icon name="history" size={20} color={colors.textMuted} />
               <Text style={styles.recentEmptyText}>
-                Nenhuma sessão registrada ainda.{'\n'}Suas sessões concluídas aparecerão aqui.
+                {t('home.noSessions')}
               </Text>
             </View>
           ) : (
@@ -274,7 +288,8 @@ export function HomeScreen() {
                       {s.workoutName}
                     </Text>
                     <Text style={styles.recentMeta}>
-                      {relativeDay(s.completedAt)} · {s.completedSets}/{s.totalSets} séries
+                      {relativeDay(s.completedAt)} ·{' '}
+                      {t('common.setsProgress', { done: s.completedSets, total: s.totalSets })}
                     </Text>
                   </View>
                   <Text style={styles.recentDuration}>{formatDuration(s.durationMs)}</Text>
@@ -288,16 +303,17 @@ export function HomeScreen() {
 
       <ConfirmSheet
         visible={clearOpen}
-        title="Limpar recentes"
-        message="Remover todo o histórico de sessões? Isso não afeta seus treinos."
+        title={t('home.clearRecentTitle')}
+        message={t('home.clearRecentMessage')}
         onClose={() => setClearOpen(false)}
-        actions={[{ label: 'Limpar histórico', variant: 'danger', onPress: clearSessions }]}
+        actions={[{ label: t('home.clearHistory'), variant: 'danger', onPress: clearSessions }]}
       />
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
   content: { paddingBottom: 24 },
   topBar: {
     flexDirection: 'row',
@@ -320,13 +336,26 @@ const styles = StyleSheet.create({
     lineHeight: 30,
     letterSpacing: 0.5,
   },
+  topActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    marginLeft: 12,
+  },
+  settingsBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.white05,
+  },
   avatar: {
     width: 48,
     height: 48,
     borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 12,
   },
   avatarText: {
     color: colors.onAccent,

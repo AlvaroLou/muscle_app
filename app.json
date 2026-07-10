@@ -12,7 +12,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#121212"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "android": {
       "package": "com.workoutplanner.app",
       "versionCode": 1,
@@ -24,6 +26,9 @@
     },
     "ios": {
       "supportsTablet": true
-    }
+    },
+    "plugins": [
+      "expo-localization"
+    ]
   }
 }

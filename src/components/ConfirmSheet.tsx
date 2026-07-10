@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text } from 'react-native';
 
-import { colors, fonts } from '@/theme';
+import { fonts, ThemeColors } from '@/theme';
+import { useTheme } from '@/theme/ThemeProvider';
 import { BottomSheet } from './BottomSheet';
 
 export interface ConfirmAction {
@@ -29,9 +31,14 @@ export function ConfirmSheet({
   title,
   message,
   actions,
-  cancelLabel = 'Cancelar',
+  cancelLabel,
   onClose,
 }: Props) {
+  const { t } = useTranslation();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  // `null` esconde o botão; `undefined` cai no rótulo padrão traduzido.
+  const resolvedCancel = cancelLabel === null ? null : (cancelLabel ?? t('common.cancel'));
   return (
     <BottomSheet visible={visible} onClose={onClose}>
       <Text style={styles.title}>{title}</Text>
@@ -63,19 +70,20 @@ export function ConfirmSheet({
         </Pressable>
       ))}
 
-      {cancelLabel ? (
+      {resolvedCancel ? (
         <Pressable
           style={({ pressed }) => [styles.cancel, pressed && styles.btnPressed]}
           onPress={onClose}
         >
-          <Text style={styles.cancelText}>{cancelLabel}</Text>
+          <Text style={styles.cancelText}>{resolvedCancel}</Text>
         </Pressable>
       ) : null}
     </BottomSheet>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
   title: {
     color: colors.text,
     fontFamily: fonts.heading,
@@ -131,4 +139,4 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     fontSize: 14,
   },
-});
+  });

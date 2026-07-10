@@ -1,15 +1,48 @@
 /**
  * Utilitários de data reais (sem dados fictícios). Baseados na data atual do
  * dispositivo. Usados no cabeçalho e no calendário semanal da Home.
+ *
+ * Localizados: os nomes de dia/mês e "Hoje/Ontem" seguem o idioma ativo do
+ * i18n. Usamos tabelas por idioma (em vez de Intl) para manter o estilo
+ * maiúsculo do design e evitar diferenças de suporte a Intl no Hermes.
  */
+import i18n from '@/i18n';
 
-const WEEKDAY_SHORT = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
-const MONTH_SHORT = [
-  'JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN',
-  'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ',
-];
-/** Letras da semana começando na segunda (Seg..Dom). */
-const WEEK_LETTERS = ['S', 'T', 'Q', 'Q', 'S', 'S', 'D'];
+interface DateStrings {
+  weekdayShort: string[]; // índice por getDay(): 0=dom..6=sáb
+  monthShort: string[];
+  weekLetters: string[]; // semana começando na segunda
+  today: string;
+  yesterday: string;
+}
+
+const STRINGS: Record<string, DateStrings> = {
+  en: {
+    weekdayShort: ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'],
+    monthShort: [
+      'JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN',
+      'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC',
+    ],
+    weekLetters: ['M', 'T', 'W', 'T', 'F', 'S', 'S'],
+    today: 'Today',
+    yesterday: 'Yesterday',
+  },
+  'pt-BR': {
+    weekdayShort: ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'],
+    monthShort: [
+      'JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN',
+      'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ',
+    ],
+    weekLetters: ['S', 'T', 'Q', 'Q', 'S', 'S', 'D'],
+    today: 'Hoje',
+    yesterday: 'Ontem',
+  },
+};
+
+/** Tabela de textos do idioma ativo (fallback para inglês). */
+function strings(): DateStrings {
+  return STRINGS[i18n.language] ?? STRINGS.en;
+}
 
 export interface WeekDay {
   letter: string;
@@ -27,13 +60,14 @@ export function dayKey(ts: number | Date): string {
 
 /** Rótulo relativo do dia: "Hoje", "Ontem" ou "SEG, 2 JUL". */
 export function relativeDay(ts: number, now: Date = new Date()): string {
+  const s = strings();
   const d = new Date(ts);
   const diffDays = Math.round(
     (dayStart(now).getTime() - dayStart(d).getTime()) / 86400000,
   );
-  if (diffDays === 0) return 'Hoje';
-  if (diffDays === 1) return 'Ontem';
-  return `${WEEKDAY_SHORT[d.getDay()]}, ${d.getDate()} ${MONTH_SHORT[d.getMonth()]}`;
+  if (diffDays === 0) return s.today;
+  if (diffDays === 1) return s.yesterday;
+  return `${s.weekdayShort[d.getDay()]}, ${d.getDate()} ${s.monthShort[d.getMonth()]}`;
 }
 
 function dayStart(d: Date): Date {
@@ -42,7 +76,8 @@ function dayStart(d: Date): Date {
 
 /** Cabeçalho tipo "QUA, 2 JUL" com a data atual. */
 export function headerDate(now: Date = new Date()): string {
-  return `${WEEKDAY_SHORT[now.getDay()]}, ${now.getDate()} ${MONTH_SHORT[now.getMonth()]}`;
+  const s = strings();
+  return `${s.weekdayShort[now.getDay()]}, ${now.getDate()} ${s.monthShort[now.getMonth()]}`;
 }
 
 /**
@@ -58,7 +93,7 @@ export function currentWeek(
   const monday = new Date(now);
   monday.setDate(now.getDate() - offsetToMonday);
 
-  return WEEK_LETTERS.map((letter, i) => {
+  return strings().weekLetters.map((letter, i) => {
     const d = new Date(monday);
     d.setDate(monday.getDate() + i);
     return {

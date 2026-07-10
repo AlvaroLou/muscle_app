@@ -1,7 +1,7 @@
 /**
  * Helpers de treino — mantidos fora das telas para reuso e consistência.
  */
-import { colors } from '@/theme';
+import { ThemeColors } from '@/theme';
 import {
   EditExercise,
   EditGroup,
@@ -12,15 +12,17 @@ import {
   WorkoutSession,
 } from '@/types';
 
-/** Paleta de cores das badges (varia por posição na lista). */
-export const BADGE_PALETTE = [
+/** Paleta de cores das badges (varia por posição na lista) — depende do tema. */
+export const badgePalette = (colors: ThemeColors) => [
   { color: colors.accent, tint: colors.accentTint },
   { color: colors.blue, tint: colors.blueTint },
   { color: colors.orange, tint: colors.orangeTint },
 ];
 
-export const badgeFor = (index: number) =>
-  BADGE_PALETTE[index % BADGE_PALETTE.length];
+export const badgeFor = (index: number, colors: ThemeColors) => {
+  const palette = badgePalette(colors);
+  return palette[index % palette.length];
+};
 
 /** Letra do treino pela posição: 0 -> A, 1 -> B... */
 export const workoutLetter = (index: number) =>
@@ -36,8 +38,10 @@ export const groupTags = (workout: Workout): string[] =>
 
 /**
  * Índice do próximo treino da rotação (A→B→C→A). Avança 1 a partir do último
- * treino concluído. Sem histórico, começa no primeiro (A). Se o último treino
- * foi excluído, recomeça do A. Com um treino só, permanece nele.
+ * treino concluído — MAS, se o último treino tem grupos e ainda faltam grupos
+ * (a última sessão não foi do último grupo), permanece no mesmo treino para
+ * concluir a cascata de grupos antes de trocar de treino. Sem histórico,
+ * começa no primeiro (A). Se o último treino foi excluído, recomeça do A.
  * `sessions` deve estar ordenado do mais recente para o mais antigo.
  */
 export function nextWorkoutIndex(
@@ -49,6 +53,16 @@ export function nextWorkoutIndex(
   if (!last) return 0;
   const lastIndex = workouts.findIndex((w) => w.id === last.workoutId);
   if (lastIndex < 0) return 0;
+
+  // Ainda há grupos a fazer neste treino? Então continua nele.
+  const lastWorkout = workouts[lastIndex];
+  if (isGrouped(lastWorkout) && last.groupId != null) {
+    const gi = lastWorkout.groups.findIndex((g) => g.id === last.groupId);
+    if (gi >= 0 && gi < lastWorkout.groups.length - 1) {
+      return lastIndex;
+    }
+  }
+
   return (lastIndex + 1) % workouts.length;
 }
 
@@ -103,6 +117,8 @@ function toEditExercise(e: Exercise): EditExercise {
     weight: e.weight > 0 ? String(e.weight) : '',
     rest: e.rest > 0 ? String(e.rest) : '',
     description: e.description ?? '',
+    libraryId: e.libraryId,
+    muscleGroup: e.muscleGroup,
   };
 }
 
@@ -124,6 +140,8 @@ function fromEditExercises(list: EditExercise[]): ExerciseInput[] {
       weight: toNumber(e.weight),
       rest: toInt(e.rest),
       description: e.description.trim(),
+      ...(e.libraryId ? { libraryId: e.libraryId } : {}),
+      ...(e.muscleGroup ? { muscleGroup: e.muscleGroup } : {}),
     }));
 }
 

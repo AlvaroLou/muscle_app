@@ -15,6 +15,57 @@ export interface Exercise {
   rest: number;
   /** Observação livre (ex.: técnica, cadência). Pode ser vazia. */
   description: string;
+  /** Id do exercício na Biblioteca, quando veio de lá. Opcional. */
+  libraryId?: string;
+  /** Grupo muscular principal, quando vinculado à Biblioteca. Opcional. */
+  muscleGroup?: MuscleGroup;
+}
+
+/** Grupos musculares usados na Biblioteca de Exercícios (filtros/categorias). */
+export type MuscleGroup =
+  | 'chest'
+  | 'back'
+  | 'shoulders'
+  | 'biceps'
+  | 'triceps'
+  | 'forearms'
+  | 'legs'
+  | 'glutes'
+  | 'calves'
+  | 'core'
+  | 'full_body'
+  | 'cardio';
+
+export type ExerciseLevel = 'beginner' | 'intermediate' | 'advanced';
+
+/** Equipamento (chave traduzida via `equipment.<key>`). */
+export type Equipment =
+  | 'barbell'
+  | 'dumbbell'
+  | 'machine'
+  | 'cable'
+  | 'bodyweight'
+  | 'kettlebell'
+  | 'band'
+  | 'other';
+
+/**
+ * Um item da Biblioteca de Exercícios. Os itens padrão têm os textos
+ * (nome/instruções/dicas) resolvidos por i18n a partir do `id`; os
+ * personalizados (`isCustom`) guardam o texto literal do usuário.
+ */
+export interface LibraryExercise {
+  id: string;
+  muscleGroup: MuscleGroup;
+  secondaryMuscles: MuscleGroup[];
+  equipment: Equipment;
+  level: ExerciseLevel;
+  isCustom: boolean;
+  /** Só nos personalizados: textos literais (não traduzidos). */
+  custom?: {
+    name: string;
+    notes?: string;
+  };
 }
 
 /** Um grupo/seção de exercícios dentro do treino (ex.: "Perna"). */
@@ -95,6 +146,8 @@ export interface EditExercise {
   weight: string;
   rest: string;
   description: string;
+  libraryId?: string;
+  muscleGroup?: MuscleGroup;
 }
 
 export interface EditGroup {

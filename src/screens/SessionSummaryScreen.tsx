@@ -1,12 +1,14 @@
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import React from 'react';
+import React, { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Icon } from '@/components/Icon';
 import { Screen } from '@/components/Screen';
 import { useWorkouts } from '@/store/WorkoutStore';
-import { colors, fonts } from '@/theme';
+import { fonts, ThemeColors } from '@/theme';
+import { useTheme } from '@/theme/ThemeProvider';
 import { relativeDay } from '@/utils/date';
 import { formatDuration } from '@/utils/time';
 import { workoutLetter } from '@/utils/workout';
@@ -22,6 +24,9 @@ function clockOf(ts: number): string {
 
 export function SessionSummaryScreen() {
   const navigation = useNavigation<Nav>();
+  const { t } = useTranslation();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const route = useRoute<RouteProp<RootStackParamList, 'SessionSummary'>>();
   const { sessions } = useWorkouts();
 
@@ -31,9 +36,9 @@ export function SessionSummaryScreen() {
     return (
       <Screen>
         <View style={styles.notFound}>
-          <Text style={styles.notFoundText}>Sessão não encontrada.</Text>
+          <Text style={styles.notFoundText}>{t('summary.notFound')}</Text>
           <Pressable onPress={() => navigation.goBack()}>
-            <Text style={styles.backText}>Voltar</Text>
+            <Text style={styles.backText}>{t('common.back')}</Text>
           </Pressable>
         </View>
       </Screen>
@@ -48,9 +53,9 @@ export function SessionSummaryScreen() {
       <View style={styles.topBar}>
         <Pressable style={styles.back} hitSlop={8} onPress={() => navigation.goBack()}>
           <Icon name="chevron-left" size={22} color={colors.accent} />
-          <Text style={styles.backText}>Voltar</Text>
+          <Text style={styles.backText}>{t('common.back')}</Text>
         </Pressable>
-        <Text style={styles.topTitle}>Resumo</Text>
+        <Text style={styles.topTitle}>{t('summary.title')}</Text>
         <View style={{ width: 70 }} />
       </View>
 
@@ -70,30 +75,28 @@ export function SessionSummaryScreen() {
         <View style={styles.statsGrid}>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>{formatDuration(session.durationMs)}</Text>
-            <Text style={styles.statLabel}>Duração</Text>
+            <Text style={styles.statLabel}>{t('summary.duration')}</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>
               {session.completedSets}/{session.totalSets}
             </Text>
-            <Text style={styles.statLabel}>Séries feitas</Text>
+            <Text style={styles.statLabel}>{t('summary.setsDone')}</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>{pct}%</Text>
-            <Text style={styles.statLabel}>Concluído</Text>
+            <Text style={styles.statLabel}>{t('summary.completed')}</Text>
           </View>
         </View>
 
-        <Text style={styles.note}>
-          O histórico guarda o resumo da sessão. Detalhes por exercício não são
-          registrados por sessão.
-        </Text>
+        <Text style={styles.note}>{t('summary.note')}</Text>
       </ScrollView>
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
   notFound: {
     flex: 1,
     alignItems: 'center',

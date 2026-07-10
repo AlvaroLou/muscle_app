@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { StyleSheet, TextInput, TextInputProps, TextStyle } from 'react-native';
 
-import { colors } from '@/theme';
+import { useTheme } from '@/theme/ThemeProvider';
 
 interface Props extends TextInputProps {
-  /** Cor da borda quando focado (padrão: neon). */
+  /** Cor da borda quando focado (padrão: accent do tema). */
   focusBorderColor?: string;
   baseBorderColor?: string;
   inputStyle?: TextStyle;
@@ -12,16 +12,19 @@ interface Props extends TextInputProps {
 
 /**
  * TextInput que troca a cor da borda ao focar — reproduz o comportamento
- * onFocus/onBlur do protótipo. Cursor/seleção em verde-neon.
+ * onFocus/onBlur do protótipo. Cursor/seleção usam o accent do tema.
  */
 export function FocusInput({
-  focusBorderColor = 'rgba(57,255,20,0.5)',
-  baseBorderColor = colors.borderInput,
+  focusBorderColor,
+  baseBorderColor,
   inputStyle,
   style,
   ...rest
 }: Props) {
+  const { colors } = useTheme();
   const [focused, setFocused] = useState(false);
+  const focusColor = focusBorderColor ?? colors.accentBorderStrong;
+  const baseColor = baseBorderColor ?? colors.borderInput;
   return (
     <TextInput
       selectionColor={colors.accent}
@@ -35,8 +38,8 @@ export function FocusInput({
         rest.onBlur?.(e);
       }}
       style={[
-        styles.base,
-        { borderColor: focused ? focusBorderColor : baseBorderColor },
+        { borderWidth: 1, color: colors.text },
+        { borderColor: focused ? focusColor : baseColor },
         inputStyle,
         style,
       ]}
@@ -44,10 +47,3 @@ export function FocusInput({
     />
   );
 }
-
-const styles = StyleSheet.create({
-  base: {
-    borderWidth: 1,
-    color: colors.text,
-  },
-});
