@@ -49,6 +49,8 @@ interface WorkoutStoreValue {
   createWorkout: (input: WorkoutInput) => Workout;
   updateWorkout: (id: string, input: WorkoutInput) => void;
   deleteWorkout: (id: string) => void;
+  /** Duplica um treino (com ids novos) logo após o original. */
+  duplicateWorkout: (id: string, newName: string) => void;
   /** Define a nova ordem completa dos treinos (usado no arrastar-e-soltar). */
   reorderWorkouts: (ordered: Workout[]) => void;
   /** Reordena os grupos de um treino. */
@@ -97,7 +99,17 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         activeSessionRepository.get(),
       ]);
       if (!active) return;
-      setWorkouts(storedWorkouts.map(normalizeWorkout));
+      const normalized = storedWorkouts.map(normalizeWorkout);
+      setWorkouts(normalized);
+      // Se algum treino/grupo legado ganhou id agora, persiste uma vez para que
+      // os ids fiquem estáveis entre reaberturas (rotação e exclusão confiáveis).
+      const gainedId = storedWorkouts.some(
+        (w: any, i) =>
+          !w?.id ||
+          (Array.isArray(w?.groups) &&
+            w.groups.some((g: any, j: number) => !g?.id && normalized[i]?.groups[j]?.id)),
+      );
+      if (gainedId) void workoutRepository.saveAll(normalized);
       setSessions(sortRecent(storedSessions));
       const fresh = freshOrNull(storedActive);
       if (!fresh && storedActive) void activeSessionRepository.clear();
@@ -192,6 +204,32 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     [commit],
   );
 
+  const duplicateWorkout = useCallback(
+    (id: string, newName: string) => {
+      commit((prev) => {
+        const idx = prev.findIndex((w) => w.id === id);
+        if (idx < 0) return prev;
+        const src = prev[idx];
+        const now = Date.now();
+        const copy: Workout = {
+          id: createId('w_'),
+          name: newName.trim() || src.name,
+          groups: src.groups.map((g) => ({
+            id: createId('g_'),
+            name: g.name,
+            exercises: g.exercises.map((e) => ({ ...e, id: createId('e_') })),
+          })),
+          createdAt: now,
+          updatedAt: now,
+        };
+        const next = [...prev];
+        next.splice(idx + 1, 0, copy);
+        return next;
+      });
+    },
+    [commit],
+  );
+
   const reorderWorkouts = useCallback(
     (ordered: Workout[]) => {
       commit(() => ordered);
@@ -239,6 +277,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       createWorkout,
       updateWorkout,
       deleteWorkout,
+      duplicateWorkout,
       reorderWorkouts,
       reorderGroups,
       reorderExercises,
@@ -256,6 +295,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       createWorkout,
       updateWorkout,
       deleteWorkout,
+      duplicateWorkout,
       reorderWorkouts,
       reorderGroups,
       reorderExercises,

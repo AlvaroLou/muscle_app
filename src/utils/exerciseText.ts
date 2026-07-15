@@ -11,12 +11,12 @@ export function exerciseName(ex: LibraryExercise, t: TFunction): string {
 }
 
 export function exerciseInstructions(ex: LibraryExercise, t: TFunction): string {
-  if (ex.isCustom) return '';
+  if (ex.isCustom) return ex.custom?.instructions ?? '';
   return t(`exercises.${ex.id}.instructions`, { defaultValue: '' });
 }
 
 export function exerciseTips(ex: LibraryExercise, t: TFunction): string {
-  if (ex.isCustom) return '';
+  if (ex.isCustom) return ex.custom?.tips ?? '';
   return t(`exercises.${ex.id}.tips`, { defaultValue: '' });
 }
 

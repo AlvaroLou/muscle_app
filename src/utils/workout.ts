@@ -6,11 +6,13 @@ import {
   EditExercise,
   EditGroup,
   Exercise,
+  ExerciseGroup,
   ExerciseInput,
   GroupInput,
   Workout,
   WorkoutSession,
 } from '@/types';
+import { createId } from '@/utils/id';
 
 /** Paleta de cores das badges (varia por posição na lista) — depende do tema. */
 export const badgePalette = (colors: ThemeColors) => [
@@ -116,7 +118,10 @@ function toEditExercise(e: Exercise): EditExercise {
     reps: String(e.reps),
     weight: e.weight > 0 ? String(e.weight) : '',
     rest: e.rest > 0 ? String(e.rest) : '',
+    restType: e.restType,
     description: e.description ?? '',
+    instructions: e.instructions,
+    tips: e.tips,
     libraryId: e.libraryId,
     muscleGroup: e.muscleGroup,
   };
@@ -140,6 +145,9 @@ function fromEditExercises(list: EditExercise[]): ExerciseInput[] {
       weight: toNumber(e.weight),
       rest: toInt(e.rest),
       description: e.description.trim(),
+      ...(e.restType ? { restType: e.restType } : {}),
+      ...(e.instructions ? { instructions: e.instructions } : {}),
+      ...(e.tips ? { tips: e.tips } : {}),
       ...(e.libraryId ? { libraryId: e.libraryId } : {}),
       ...(e.muscleGroup ? { muscleGroup: e.muscleGroup } : {}),
     }));
@@ -163,19 +171,32 @@ export function fromEditGroups(list: EditGroup[]): GroupInput[] {
  * `exercises`) para grupos, embrulhando tudo num grupo "Geral".
  */
 export function normalizeWorkout(raw: any): Workout {
+  // Garante um id único mesmo para dados legados sem id (senão não dá para
+  // excluir/identificar o treino individualmente).
+  const rawId = raw?.id != null ? String(raw.id) : '';
   const base = {
-    id: String(raw?.id ?? ''),
+    id: rawId.length > 0 ? rawId : createId('w_'),
     name: String(raw?.name ?? ''),
     createdAt: Number(raw?.createdAt ?? Date.now()),
     updatedAt: Number(raw?.updatedAt ?? Date.now()),
   };
   if (Array.isArray(raw?.groups)) {
-    return { ...base, groups: raw.groups };
+    return { ...base, groups: raw.groups.map(normalizeGroup) };
   }
   if (Array.isArray(raw?.exercises)) {
     return { ...base, groups: [{ id: 'g_geral', name: 'Geral', exercises: raw.exercises }] };
   }
   return { ...base, groups: [] };
+}
+
+/** Garante id nos grupos legados (necessário para a rotação por grupo). */
+function normalizeGroup(raw: any): ExerciseGroup {
+  const rawId = raw?.id != null ? String(raw.id) : '';
+  return {
+    id: rawId.length > 0 ? rawId : createId('g_'),
+    name: String(raw?.name ?? ''),
+    exercises: Array.isArray(raw?.exercises) ? raw.exercises : [],
+  };
 }
 
 function toInt(value: string): number {

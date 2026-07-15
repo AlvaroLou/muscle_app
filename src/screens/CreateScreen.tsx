@@ -19,17 +19,23 @@ import {
   ScaleDecorator,
 } from 'react-native-draggable-flatlist';
 
+import { BannerAd } from '@/components/BannerAd';
 import { BottomSheet } from '@/components/BottomSheet';
 import { ConfirmSheet } from '@/components/ConfirmSheet';
 import { FocusInput } from '@/components/FocusInput';
 import { Icon } from '@/components/Icon';
 import { Screen } from '@/components/Screen';
+import { DEFAULT_REST_TYPE, REST_TYPES } from '@/services/rest';
 import { useExerciseLibrary } from '@/store/ExerciseLibraryStore';
 import { useWorkouts } from '@/store/WorkoutStore';
-import { EditExercise, EditGroup, LibraryExercise } from '@/types';
+import { EditExercise, EditGroup, LibraryExercise, RestType } from '@/types';
 import { fonts, ThemeColors } from '@/theme';
 import { useTheme } from '@/theme/ThemeProvider';
-import { exerciseName } from '@/utils/exerciseText';
+import {
+  exerciseInstructions,
+  exerciseName,
+  exerciseNotes,
+} from '@/utils/exerciseText';
 import { createId } from '@/utils/id';
 import { fromEditGroups, toEditGroups } from '@/utils/workout';
 import { RootStackParamList } from '@/navigation/types';
@@ -49,11 +55,10 @@ const NUMERIC_FIELDS: {
   { labelKey: 'create.fieldSets', field: 'sets' },
   { labelKey: 'create.fieldReps', field: 'reps' },
   { labelKey: 'create.fieldWeight', field: 'weight' },
-  { labelKey: 'create.fieldRest', field: 'rest', placeholder: '90' },
   { labelKey: 'create.fieldDescription', field: 'description', placeholderKey: 'create.descPlaceholder' },
 ];
-const firstRow = NUMERIC_FIELDS.slice(0, 4);
-const secondRow = NUMERIC_FIELDS.slice(4);
+const firstRow = NUMERIC_FIELDS.slice(0, 3);
+const secondRow = NUMERIC_FIELDS.slice(3);
 
 const emptyExercise = (): DraftExercise => ({
   key: createId('ek_'),
@@ -61,7 +66,8 @@ const emptyExercise = (): DraftExercise => ({
   sets: '3',
   reps: '10',
   weight: '',
-  rest: '90',
+  rest: '0',
+  restType: DEFAULT_REST_TYPE,
   description: '',
 });
 const emptyGroup = (): DraftGroup => ({
@@ -164,11 +170,29 @@ export function CreateScreen() {
   const reorderExercisesLocal = (gKey: string, ordered: DraftExercise[]) =>
     setGroups((prev) => prev.map((g) => (g.key === gKey ? { ...g, exercises: ordered } : g)));
 
-  // Adiciona um exercício da Biblioteca ao grupo (pré-preenche nome + vínculo).
+  const updateExerciseRest = (gKey: string, eKey: string, restType: RestType) =>
+    setGroups((prev) =>
+      prev.map((g) =>
+        g.key === gKey
+          ? {
+              ...g,
+              exercises: g.exercises.map((ex) =>
+                ex.key === eKey ? { ...ex, restType } : ex,
+              ),
+            }
+          : g,
+      ),
+    );
+
+  // Adiciona um exercício da Biblioteca ao grupo, copiando o descanso e levando
+  // as instruções recomendadas para a descrição (editável só neste treino).
+  // Instruções/dicas em si ficam apenas na Biblioteca.
   const addFromLibrary = (gKey: string, lib: LibraryExercise) => {
     const draft: DraftExercise = {
       ...emptyExercise(),
       name: exerciseName(lib, t),
+      restType: lib.restType ?? DEFAULT_REST_TYPE,
+      description: exerciseInstructions(lib, t) || exerciseNotes(lib, t) || '',
       libraryId: lib.id,
       muscleGroup: lib.muscleGroup,
     };
@@ -179,12 +203,17 @@ export function CreateScreen() {
     setPickerQuery('');
   };
 
-  // Lista filtrada para o picker.
+  // Lista filtrada para o picker: casa por nome OU pelo grupo muscular
+  // (principal ou secundário), para buscas como "peito" trazerem tudo que
+  // envolve o peito.
   const pickerResults = useMemo(() => {
     const q = pickerQuery.trim().toLowerCase();
-    return libraryExercises.filter(
-      (ex) => !q || exerciseName(ex, t).toLowerCase().includes(q),
-    );
+    if (!q) return libraryExercises;
+    return libraryExercises.filter((ex) => {
+      if (exerciseName(ex, t).toLowerCase().includes(q)) return true;
+      const muscles = [ex.muscleGroup, ...ex.secondaryMuscles];
+      return muscles.some((m) => t(`muscleGroups.${m}`).toLowerCase().includes(q));
+    });
   }, [libraryExercises, pickerQuery, t]);
 
   const renderAddExercise = (gKey: string) => (
@@ -246,6 +275,24 @@ export function CreateScreen() {
               </View>
             ))}
           </View>
+          <Text style={styles.numericLabel}>{t('create.restLabel')}</Text>
+          <View style={styles.restRow}>
+            {REST_TYPES.map((rt) => {
+              const active = (ex.restType ?? DEFAULT_REST_TYPE) === rt;
+              return (
+                <Pressable
+                  key={rt}
+                  onPress={() => updateExerciseRest(gKey, ex.key, rt)}
+                  style={[styles.restChip, active && styles.restChipActive]}
+                >
+                  <Text style={[styles.restChipText, active && styles.restChipTextActive]}>
+                    {t(`rest.${rt}`)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
           <View style={styles.numericRow}>
             {secondRow.map(({ labelKey, field, placeholder, placeholderKey }) => (
               <View key={field} style={styles.numericCol}>
@@ -374,6 +421,8 @@ export function CreateScreen() {
           <Text style={styles.save}>{t('common.save')}</Text>
         </Pressable>
       </View>
+
+      <BannerAd />
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -625,6 +674,34 @@ const makeStyles = (colors: ThemeColors) =>
     fontSize: 14,
     textAlign: 'center',
     fontFamily: fonts.mono,
+  },
+  restRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 2,
+    marginBottom: 4,
+  },
+  restChip: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 9,
+    borderRadius: 8,
+    backgroundColor: colors.inputAlt,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+  },
+  restChipActive: {
+    backgroundColor: colors.accentTint,
+    borderColor: colors.accentBorder,
+  },
+  restChipText: {
+    color: colors.textDim2,
+    fontFamily: fonts.bodyMed,
+    fontSize: 12,
+  },
+  restChipTextActive: {
+    color: colors.accent,
+    fontFamily: fonts.bodyBold,
   },
   descriptionInput: {
     backgroundColor: colors.inputAlt,

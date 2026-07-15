@@ -14,17 +14,21 @@ import {
   preferencesRepository,
   ThemeId,
 } from '@/repositories/preferencesRepository';
+import { DEFAULT_REST_DURATIONS, RestDurations } from '@/services/rest';
+import { RestType } from '@/types';
 
 /**
- * Store de preferências do usuário: idioma e tema. Carrega o que estiver salvo
- * na montagem, aplica no i18next e persiste a cada mudança. O ThemeProvider
- * consome `themeId` daqui.
+ * Store de preferências do usuário: idioma, tema e descansos. Carrega o que
+ * estiver salvo na montagem, aplica no i18next e persiste a cada mudança. O
+ * ThemeProvider consome `themeId` daqui; o app inteiro consome `restDurations`.
  */
 interface PreferencesValue {
   language: LanguageCode;
   themeId: ThemeId;
+  restDurations: RestDurations;
   setLanguage: (lng: LanguageCode) => void;
   setThemeId: (id: ThemeId) => void;
+  setRestDuration: (type: RestType, seconds: number) => void;
 }
 
 const PreferencesContext = createContext<PreferencesValue | undefined>(undefined);
@@ -34,6 +38,8 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     (i18n.language as LanguageCode) ?? 'en',
   );
   const [themeId, setThemeIdState] = useState<ThemeId>('dark');
+  const [restDurations, setRestDurationsState] =
+    useState<RestDurations>(DEFAULT_REST_DURATIONS);
 
   // Carrega preferências salvas na montagem e aplica o idioma no i18next.
   useEffect(() => {
@@ -46,6 +52,9 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
         void i18n.changeLanguage(stored.language);
       }
       if (stored.themeId) setThemeIdState(stored.themeId);
+      if (stored.restDurations) {
+        setRestDurationsState({ ...DEFAULT_REST_DURATIONS, ...stored.restDurations });
+      }
     })();
     return () => {
       active = false;
@@ -75,9 +84,20 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     [persist],
   );
 
+  const setRestDuration = useCallback(
+    (type: RestType, seconds: number) => {
+      setRestDurationsState((prev) => {
+        const next = { ...prev, [type]: seconds };
+        persist({ restDurations: next });
+        return next;
+      });
+    },
+    [persist],
+  );
+
   const value = useMemo<PreferencesValue>(
-    () => ({ language, themeId, setLanguage, setThemeId }),
-    [language, themeId, setLanguage, setThemeId],
+    () => ({ language, themeId, restDurations, setLanguage, setThemeId, setRestDuration }),
+    [language, themeId, restDurations, setLanguage, setThemeId, setRestDuration],
   );
 
   return (

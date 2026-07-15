@@ -34,6 +34,7 @@
     "recent": "RECENTES",
     "noWorkoutsYet": "Sem treinos ainda",
     "startWorkout": "INICIAR TREINO",
+    "resumeWorkout": "RETOMAR TREINO",
     "createWorkout": "CRIAR TREINO",
     "noSessions": "Nenhuma sessão registrada ainda.\nSuas sessões concluídas aparecerão aqui.",
     "clearRecentTitle": "Limpar recentes",
@@ -61,6 +62,9 @@
     "startDesc": "Segue a rotação da semana",
     "editTitle": "Editar",
     "editDesc": "Alterar nome e exercícios",
+    "duplicateTitle": "Duplicar",
+    "duplicateDesc": "Criar uma cópia",
+    "copyName": "{{name}} (cópia)",
     "deleteTitle": "Excluir",
     "deleteDesc": "Remover este treino"
   },
@@ -78,7 +82,17 @@
     "duration": "Duração",
     "setsDone": "Séries feitas",
     "completed": "Concluído",
-    "note": "O histórico guarda o resumo da sessão. Detalhes por exercício não são registrados por sessão."
+    "exercisesStat": "Exercícios",
+    "repsStat": "Repetições",
+    "volumeStat": "Volume",
+    "totalRestStat": "Descanso total",
+    "avgRestStat": "Descanso médio",
+    "skippedStat": "Ignorados",
+    "byExercise": "POR EXERCÍCIO",
+    "volumeKg": "{{value}} kg",
+    "startEnd": "{{start}} – {{end}}",
+    "exerciseSets": "{{done}}/{{planned}} séries",
+    "note": "O histórico guarda o resumo da sessão. Os valores usam reps, carga e descanso planejados do treino."
   },
   "details": {
     "notFound": "Treino não encontrado.",
@@ -97,7 +111,11 @@
   "rest": {
     "title": "DESCANSO",
     "upNext": "A seguir:",
-    "skip": "Pular descanso"
+    "skip": "Pular descanso",
+    "light": "Leve",
+    "moderate": "Moderado",
+    "long": "Longo",
+    "seconds": "{{count}}s"
   },
   "active": {
     "noExercises": "Este treino não tem exercícios.",
@@ -112,13 +130,17 @@
     "exerciseCounter": "Exercício {{current}} de {{total}}",
     "reps": "{{reps}} reps",
     "setLabel": "Série {{n}}",
+    "kg": "kg",
     "previous": "Anterior",
     "finish": "FINALIZAR",
     "next": "PRÓXIMO",
     "quitTitle": "Sair do treino",
     "quitMessage": "O treino continua em segundo plano para você retomar.",
     "quitLeave": "Sair (continuar depois)",
-    "quitDiscard": "Descartar treino"
+    "quitDiscard": "Descartar treino",
+    "watchAd": "Assistir anúncio — 30 min sem anúncios",
+    "adThanks": "Valeu! Sem anúncios por 30 minutos.",
+    "adUnavailable": "Nenhum anúncio disponível agora."
   },
   "settings": {
     "title": "Configurações",
@@ -131,6 +153,14 @@
     "themeGreen": "Verde",
     "appearance": "APARÊNCIA",
     "general": "GERAL",
+    "workoutPrefs": "PREFERÊNCIAS DE TREINO",
+    "restDurations": "Tempos de descanso",
+    "restDurationsHint": "Aplicados em todo lugar que usa as categorias Leve / Moderado / Longo.",
+    "premium": "PREMIUM",
+    "proMode": "Modo Pro",
+    "proOn": "Ligado — sem anúncios",
+    "proOff": "Desligado — Free (com anúncios)",
+    "premiumDevHint": "Toggle de desenvolvimento para testar Free vs Pro. Será substituído pelo Google Play Billing.",
     "proHint": "Mais temas e cores personalizadas chegam no Pro."
   },
   "create": {
@@ -147,6 +177,7 @@
     "fieldWeight": "Peso(kg)",
     "fieldRest": "Descanso(s)",
     "fieldDescription": "Descrição",
+    "restLabel": "DESCANSO",
     "descPlaceholder": "Ex.: Segurar 1 segundo no pico da contração...",
     "nameRequiredTitle": "Nome obrigatório",
     "nameRequiredMessage": "Dê um nome ao treino antes de salvar.",
@@ -175,11 +206,15 @@
     "customNamePlaceholder": "Nome do exercício",
     "customNotes": "Observações",
     "customNotesPlaceholder": "Observações (opcional)",
+    "restLabel": "Descanso",
+    "instructionsPlaceholder": "Como executar este exercício...",
+    "tipsPlaceholder": "Dicas de postura e execução...",
     "customBadge": "Personalizado",
     "deleteCustomTitle": "Excluir exercício",
     "deleteCustomMessage": "Remover este exercício personalizado?",
     "duplicate": "Duplicar",
     "none": "Nenhum",
+    "notProvided": "Não informado",
     "count_one": "{{count}} exercício",
     "count_other": "{{count}} exercícios"
   },

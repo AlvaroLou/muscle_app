@@ -3,6 +3,9 @@
  * "Costas"), e cada grupo tem seus exercícios.
  */
 
+/** Categoria de descanso. Os segundos vêm da config global (Settings). */
+export type RestType = 'light' | 'moderate' | 'long';
+
 /** Um exercício dentro de um grupo. */
 export interface Exercise {
   id: string;
@@ -11,10 +14,19 @@ export interface Exercise {
   reps: number;
   /** Carga em kg. 0 = peso corporal. */
   weight: number;
-  /** Descanso entre séries, em segundos. 0 = usar o padrão global. */
+  /**
+   * Descanso entre séries, em segundos. LEGADO — novos exercícios usam
+   * `restType` + a config global. 0 = usar o padrão global.
+   */
   rest: number;
+  /** Categoria de descanso (Light/Moderate/Long). Resolve segundos via config. */
+  restType?: RestType;
   /** Observação livre (ex.: técnica, cadência). Pode ser vazia. */
   description: string;
+  /** Instruções de execução copiadas da Biblioteca (editáveis no treino). */
+  instructions?: string;
+  /** Dicas de postura copiadas da Biblioteca. */
+  tips?: string;
   /** Id do exercício na Biblioteca, quando veio de lá. Opcional. */
   libraryId?: string;
   /** Grupo muscular principal, quando vinculado à Biblioteca. Opcional. */
@@ -60,11 +72,15 @@ export interface LibraryExercise {
   secondaryMuscles: MuscleGroup[];
   equipment: Equipment;
   level: ExerciseLevel;
+  /** Descanso recomendado (categoria). Copiado ao usar no treino. */
+  restType?: RestType;
   isCustom: boolean;
   /** Só nos personalizados: textos literais (não traduzidos). */
   custom?: {
     name: string;
     notes?: string;
+    instructions?: string;
+    tips?: string;
   };
 }
 
@@ -89,6 +105,22 @@ export interface Workout {
  * momento em que foi feito, para que o histórico continue válido mesmo que o
  * treino seja editado ou excluído depois.
  */
+/**
+ * Resumo de um exercício dentro de uma sessão (snapshot). `weight` é a carga
+ * média real das séries concluídas (quando informada durante o treino); reps
+ * seguem o plano. `volume` soma reps × carga real de cada série feita.
+ */
+export interface SessionExercise {
+  name: string;
+  muscleGroup?: MuscleGroup;
+  setsDone: number;
+  setsPlanned: number;
+  reps: number;
+  weight: number;
+  volume: number;
+  restSeconds: number;
+}
+
 export interface WorkoutSession {
   id: string;
   workoutId: string;
@@ -101,6 +133,16 @@ export interface WorkoutSession {
   durationMs: number;
   completedSets: number;
   totalSets: number;
+  // ----- Estatísticas ricas (opcionais; sessões antigas não têm) -----
+  startedAt?: number;
+  completedExercises?: number;
+  totalExercises?: number;
+  totalReps?: number;
+  totalVolume?: number;
+  totalRestMs?: number;
+  restCount?: number;
+  skippedExercises?: number;
+  exercises?: SessionExercise[];
 }
 
 /**
@@ -117,6 +159,8 @@ export interface ActiveSession {
   currentExerciseIndex: number;
   /** Séries concluídas, como `"<exerciseId>:<setIndex>"`. */
   completedSetKeys: string[];
+  /** Carga real informada por série: `"<exerciseId>:<setIndex>" → kg`. */
+  setWeights?: Record<string, number>;
   accumulatedMs: number;
   lastResumeAt: number | null;
   running: boolean;
@@ -145,7 +189,10 @@ export interface EditExercise {
   reps: string;
   weight: string;
   rest: string;
+  restType?: RestType;
   description: string;
+  instructions?: string;
+  tips?: string;
   libraryId?: string;
   muscleGroup?: MuscleGroup;
 }

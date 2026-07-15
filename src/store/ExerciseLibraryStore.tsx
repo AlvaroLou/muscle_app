@@ -9,13 +9,17 @@ import React, {
 
 import { STANDARD_EXERCISES } from '@/data/exerciseLibrary';
 import { exerciseLibraryRepository } from '@/repositories/exerciseLibraryRepository';
-import { Equipment, LibraryExercise, MuscleGroup } from '@/types';
+import { Equipment, LibraryExercise, MuscleGroup, RestType } from '@/types';
 import { createId } from '@/utils/id';
 
 export interface CustomExerciseInput {
   name: string;
   muscleGroup: MuscleGroup;
+  secondaryMuscles: MuscleGroup[];
   equipment: Equipment;
+  restType?: RestType;
+  instructions?: string;
+  tips?: string;
   notes?: string;
 }
 
@@ -34,15 +38,25 @@ interface ExerciseLibraryValue {
 
 const ExerciseLibraryContext = createContext<ExerciseLibraryValue | undefined>(undefined);
 
+function customFields(input: CustomExerciseInput): LibraryExercise['custom'] {
+  return {
+    name: input.name.trim(),
+    notes: input.notes?.trim() || undefined,
+    instructions: input.instructions?.trim() || undefined,
+    tips: input.tips?.trim() || undefined,
+  };
+}
+
 function toCustom(input: CustomExerciseInput): LibraryExercise {
   return {
     id: createId('lx_'),
     muscleGroup: input.muscleGroup,
-    secondaryMuscles: [],
+    secondaryMuscles: input.secondaryMuscles,
     equipment: input.equipment,
     level: 'beginner',
+    restType: input.restType,
     isCustom: true,
-    custom: { name: input.name.trim(), notes: input.notes?.trim() || undefined },
+    custom: customFields(input),
   };
 }
 
@@ -111,8 +125,10 @@ export function ExerciseLibraryProvider({ children }: { children: React.ReactNod
             ? {
                 ...e,
                 muscleGroup: input.muscleGroup,
+                secondaryMuscles: input.secondaryMuscles,
                 equipment: input.equipment,
-                custom: { name: input.name.trim(), notes: input.notes?.trim() || undefined },
+                restType: input.restType,
+                custom: customFields(input),
               }
             : e,
         ),

@@ -10,6 +10,8 @@ export interface SessionSet {
   exerciseId: string;
   setIndex: number;
   completed: boolean;
+  /** Carga real desta série (kg). Inicia com o peso planejado do exercício. */
+  weight: number;
 }
 
 /** Chave estável de uma série, usada para persistir/retomar. */
@@ -44,12 +46,17 @@ export function useWorkoutSession(workout: Workout, initial?: ActiveSession) {
 
   const [sets, setSets] = useState<SessionSet[]>(() => {
     const done = new Set(initial?.completedSetKeys ?? []);
+    const weights = initial?.setWeights ?? {};
     return items.flatMap(({ exercise }) =>
-      Array.from({ length: exercise.sets }, (_, setIndex) => ({
-        exerciseId: exercise.id,
-        setIndex,
-        completed: done.has(setKey(exercise.id, setIndex)),
-      })),
+      Array.from({ length: exercise.sets }, (_, setIndex) => {
+        const key = setKey(exercise.id, setIndex);
+        return {
+          exerciseId: exercise.id,
+          setIndex,
+          completed: done.has(key),
+          weight: weights[key] ?? exercise.weight,
+        };
+      }),
     );
   });
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState(
@@ -85,6 +92,20 @@ export function useWorkoutSession(workout: Workout, initial?: ActiveSession) {
     );
     return nowCompleted;
   }, []);
+
+  /** Define a carga real (kg) de uma série. */
+  const setSetWeight = useCallback(
+    (exerciseId: string, setIndex: number, weight: number) => {
+      setSets((prev) =>
+        prev.map((s) =>
+          s.exerciseId === exerciseId && s.setIndex === setIndex
+            ? { ...s, weight }
+            : s,
+        ),
+      );
+    },
+    [],
+  );
 
   const nextExercise = useCallback(
     () => setCurrentExerciseIndex((i) => Math.min(i + 1, items.length - 1)),
@@ -133,6 +154,13 @@ export function useWorkoutSession(workout: Workout, initial?: ActiveSession) {
     [sets],
   );
 
+  /** Carga real por série (`"<exerciseId>:<setIndex>" → kg`) para persistir. */
+  const setWeights = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const s of sets) map[setKey(s.exerciseId, s.setIndex)] = s.weight;
+    return map;
+  }, [sets]);
+
   return {
     elapsedMs: stopwatch.elapsedMs,
     running: stopwatch.running,
@@ -140,6 +168,8 @@ export function useWorkoutSession(workout: Workout, initial?: ActiveSession) {
     resume: stopwatch.start,
     sets,
     completedSetKeys,
+    setWeights,
+    setSetWeight,
     totalSets,
     completedSets,
     progress,

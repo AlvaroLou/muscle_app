@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 
+import { BannerAd } from '@/components/BannerAd';
 import { Icon } from '@/components/Icon';
 import { Screen } from '@/components/Screen';
 import { MUSCLE_GROUP_ORDER } from '@/data/exerciseLibrary';
@@ -104,6 +105,8 @@ export function ExerciseLibraryScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>{t('library.title')}</Text>
       </View>
+
+      <BannerAd />
 
       {/* Search */}
       <View style={styles.searchWrap}>

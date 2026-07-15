@@ -6,6 +6,7 @@ import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { BannerAd } from '@/components/BannerAd';
 import { ConfirmSheet } from '@/components/ConfirmSheet';
 import { GradientButton } from '@/components/GradientButton';
 import { Icon } from '@/components/Icon';
@@ -117,26 +118,7 @@ export function HomeScreen() {
           </View>
         </View>
 
-        {/* Treino em andamento (retomar) */}
-        {activeSession ? (
-          <View style={styles.section}>
-            <Pressable
-              onPress={resumeWorkout}
-              style={({ pressed }) => [styles.resumeCard, pressed && styles.resumePressed]}
-            >
-              <View style={styles.resumeIcon}>
-                <Icon name="timer" size={20} color={colors.accent} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.resumeLabel}>{t('home.inProgress')}</Text>
-                <Text style={styles.resumeName} numberOfLines={1}>
-                  {activeSession.workoutName}
-                </Text>
-              </View>
-              <Text style={styles.resumeCta}>{t('home.resume')}</Text>
-            </Pressable>
-          </View>
-        ) : null}
+        <BannerAd />
 
         {/* Weekly tracker */}
         <View style={styles.section}>
@@ -242,7 +224,10 @@ export function HomeScreen() {
                       />
                     </View>
                   </Pressable>
-                  <GradientButton label={t('home.startWorkout')} onPress={startWorkout} />
+                  <GradientButton
+                    label={activeSession ? t('home.resumeWorkout') : t('home.startWorkout')}
+                    onPress={activeSession ? resumeWorkout : startWorkout}
+                  />
                 </>
               ) : (
                 <>
@@ -365,45 +350,6 @@ const makeStyles = (colors: ThemeColors) =>
   section: {
     paddingHorizontal: 20,
     marginBottom: 20,
-  },
-  // Retomar treino
-  resumeCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: colors.cardAlt,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.accentBorder,
-    padding: 14,
-  },
-  resumePressed: {
-    opacity: 0.85,
-  },
-  resumeIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-    backgroundColor: colors.accentTint,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  resumeLabel: {
-    color: colors.accent,
-    fontFamily: fonts.mono,
-    fontSize: 10,
-    letterSpacing: 1,
-  },
-  resumeName: {
-    color: colors.text,
-    fontFamily: fonts.bodyBold,
-    fontSize: 15,
-    marginTop: 2,
-  },
-  resumeCta: {
-    color: colors.accent,
-    fontFamily: fonts.bodyBold,
-    fontSize: 14,
   },
   recentHeader: {
     flexDirection: 'row',

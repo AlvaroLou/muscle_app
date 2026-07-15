@@ -5,6 +5,7 @@ import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { BannerAd } from '@/components/BannerAd';
 import { ConfirmSheet } from '@/components/ConfirmSheet';
 import { Icon } from '@/components/Icon';
 import { Screen } from '@/components/Screen';
@@ -44,6 +45,8 @@ export function HistoryScreen() {
           </Pressable>
         ) : null}
       </View>
+
+      <BannerAd />
 
       {sessions.length === 0 ? (
         <View style={styles.empty}>

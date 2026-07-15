@@ -34,6 +34,7 @@
     "recent": "RECENT",
     "noWorkoutsYet": "No workouts yet",
     "startWorkout": "START WORKOUT",
+    "resumeWorkout": "RESUME WORKOUT",
     "createWorkout": "CREATE WORKOUT",
     "noSessions": "No sessions recorded yet.\nYour completed sessions will appear here.",
     "clearRecentTitle": "Clear recent",
@@ -61,6 +62,9 @@
     "startDesc": "Follows the weekly rotation",
     "editTitle": "Edit",
     "editDesc": "Change name and exercises",
+    "duplicateTitle": "Duplicate",
+    "duplicateDesc": "Create a copy",
+    "copyName": "{{name}} (copy)",
     "deleteTitle": "Delete",
     "deleteDesc": "Remove this workout"
   },
@@ -78,7 +82,17 @@
     "duration": "Duration",
     "setsDone": "Sets done",
     "completed": "Completed",
-    "note": "History keeps the session summary. Per-exercise details are not recorded per session."
+    "exercisesStat": "Exercises",
+    "repsStat": "Reps",
+    "volumeStat": "Volume",
+    "totalRestStat": "Total rest",
+    "avgRestStat": "Avg rest",
+    "skippedStat": "Skipped",
+    "byExercise": "BY EXERCISE",
+    "volumeKg": "{{value}} kg",
+    "startEnd": "{{start}} – {{end}}",
+    "exerciseSets": "{{done}}/{{planned}} sets",
+    "note": "History keeps the session summary. Values use the workout's planned reps, load and rest."
   },
   "details": {
     "notFound": "Workout not found.",
@@ -97,7 +111,11 @@
   "rest": {
     "title": "REST",
     "upNext": "Next:",
-    "skip": "Skip rest"
+    "skip": "Skip rest",
+    "light": "Light",
+    "moderate": "Moderate",
+    "long": "Long",
+    "seconds": "{{count}}s"
   },
   "active": {
     "noExercises": "This workout has no exercises.",
@@ -112,13 +130,17 @@
     "exerciseCounter": "Exercise {{current}} of {{total}}",
     "reps": "{{reps}} reps",
     "setLabel": "Set {{n}}",
+    "kg": "kg",
     "previous": "Previous",
     "finish": "FINISH",
     "next": "NEXT",
     "quitTitle": "Leave workout",
     "quitMessage": "The workout stays in the background so you can resume it.",
     "quitLeave": "Leave (continue later)",
-    "quitDiscard": "Discard workout"
+    "quitDiscard": "Discard workout",
+    "watchAd": "Watch an ad — 30 min ad-free",
+    "adThanks": "Thanks! No ads for 30 minutes.",
+    "adUnavailable": "No ad available right now."
   },
   "settings": {
     "title": "Settings",
@@ -131,6 +153,14 @@
     "themeGreen": "Green",
     "appearance": "APPEARANCE",
     "general": "GENERAL",
+    "workoutPrefs": "WORKOUT PREFERENCES",
+    "restDurations": "Rest durations",
+    "restDurationsHint": "Applied everywhere the Light / Moderate / Long categories are used.",
+    "premium": "PREMIUM",
+    "proMode": "Pro mode",
+    "proOn": "On — no ads",
+    "proOff": "Off — Free (with ads)",
+    "premiumDevHint": "Developer toggle to preview Free vs Pro. Will be replaced by Google Play Billing.",
     "proHint": "More themes and custom colors are coming to Pro."
   },
   "create": {
@@ -147,6 +177,7 @@
     "fieldWeight": "Weight(kg)",
     "fieldRest": "Rest(s)",
     "fieldDescription": "Description",
+    "restLabel": "REST",
     "descPlaceholder": "e.g.: Hold 1 second at peak contraction...",
     "nameRequiredTitle": "Name required",
     "nameRequiredMessage": "Give the workout a name before saving.",
@@ -175,11 +206,15 @@
     "customNamePlaceholder": "Exercise name",
     "customNotes": "Notes",
     "customNotesPlaceholder": "Optional notes",
+    "restLabel": "Rest",
+    "instructionsPlaceholder": "How to perform this exercise...",
+    "tipsPlaceholder": "Posture and form tips...",
     "customBadge": "Custom",
     "deleteCustomTitle": "Delete exercise",
     "deleteCustomMessage": "Remove this custom exercise?",
     "duplicate": "Duplicate",
     "none": "None",
+    "notProvided": "Not provided",
     "count_one": "{{count}} exercise",
     "count_other": "{{count}} exercises"
   },

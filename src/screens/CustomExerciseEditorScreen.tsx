@@ -13,11 +13,13 @@ import {
   View,
 } from 'react-native';
 
+import { BannerAd } from '@/components/BannerAd';
 import { Icon } from '@/components/Icon';
 import { Screen } from '@/components/Screen';
 import { MUSCLE_GROUP_ORDER } from '@/data/exerciseLibrary';
+import { REST_TYPES } from '@/services/rest';
 import { useExerciseLibrary } from '@/store/ExerciseLibraryStore';
-import { Equipment, MuscleGroup } from '@/types';
+import { Equipment, MuscleGroup, RestType } from '@/types';
 import { fonts, ThemeColors } from '@/theme';
 import { useTheme } from '@/theme/ThemeProvider';
 import { RootStackParamList } from '@/navigation/types';
@@ -48,14 +50,37 @@ export function CustomExerciseEditorScreen() {
 
   const [name, setName] = useState(existing?.custom?.name ?? '');
   const [muscleGroup, setMuscleGroup] = useState<MuscleGroup>(existing?.muscleGroup ?? 'chest');
+  const [secondary, setSecondary] = useState<Set<MuscleGroup>>(
+    new Set(existing?.secondaryMuscles ?? []),
+  );
   const [equipment, setEquipment] = useState<Equipment>(existing?.equipment ?? 'bodyweight');
+  const [restType, setRestType] = useState<RestType | undefined>(existing?.restType);
+  const [instructions, setInstructions] = useState(existing?.custom?.instructions ?? '');
+  const [tips, setTips] = useState(existing?.custom?.tips ?? '');
   const [notes, setNotes] = useState(existing?.custom?.notes ?? '');
+
+  const toggleSecondary = (m: MuscleGroup) =>
+    setSecondary((prev) => {
+      const next = new Set(prev);
+      next.has(m) ? next.delete(m) : next.add(m);
+      return next;
+    });
 
   const canSave = name.trim().length > 0;
 
   const save = () => {
     if (!canSave) return;
-    const input = { name, muscleGroup, equipment, notes };
+    const input = {
+      name,
+      muscleGroup,
+      // O grupo principal não pode ser também secundário.
+      secondaryMuscles: [...secondary].filter((m) => m !== muscleGroup),
+      equipment,
+      restType,
+      instructions,
+      tips,
+      notes,
+    };
     if (editingId && existing) {
       updateCustom(editingId, input);
     } else {
@@ -77,6 +102,8 @@ export function CustomExerciseEditorScreen() {
           <Text style={[styles.save, !canSave && styles.saveDisabled]}>{t('common.save')}</Text>
         </Pressable>
       </View>
+
+      <BannerAd />
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -112,6 +139,24 @@ export function CustomExerciseEditorScreen() {
             ))}
           </View>
 
+          <Text style={styles.label}>{t('library.secondaryMuscles')}</Text>
+          <View style={styles.chipWrap}>
+            {MUSCLE_GROUP_ORDER.filter((m) => m !== muscleGroup).map((m) => {
+              const on = secondary.has(m);
+              return (
+                <Pressable
+                  key={m}
+                  onPress={() => toggleSecondary(m)}
+                  style={[styles.chip, on && styles.chipActive]}
+                >
+                  <Text style={[styles.chipText, on && styles.chipTextActive]}>
+                    {t(`muscleGroups.${m}`)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
           <Text style={styles.label}>{t('library.equipmentLabel')}</Text>
           <View style={styles.chipWrap}>
             {EQUIPMENT_OPTIONS.map((e) => (
@@ -126,6 +171,47 @@ export function CustomExerciseEditorScreen() {
               </Pressable>
             ))}
           </View>
+
+          <Text style={styles.label}>{t('library.restLabel')}</Text>
+          <View style={styles.chipWrap}>
+            {REST_TYPES.map((rt) => (
+              <Pressable
+                key={rt}
+                onPress={() => setRestType(restType === rt ? undefined : rt)}
+                style={[styles.chip, restType === rt && styles.chipActive]}
+              >
+                <Text style={[styles.chipText, restType === rt && styles.chipTextActive]}>
+                  {t(`rest.${rt}`)}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <Text style={styles.label}>{t('library.instructions')}</Text>
+          <TextInput
+            value={instructions}
+            onChangeText={setInstructions}
+            placeholder={t('library.instructionsPlaceholder')}
+            placeholderTextColor={colors.textMuted}
+            selectionColor={colors.accent}
+            multiline
+            numberOfLines={4}
+            textAlignVertical="top"
+            style={[styles.input, styles.notesInput]}
+          />
+
+          <Text style={styles.label}>{t('library.tips')}</Text>
+          <TextInput
+            value={tips}
+            onChangeText={setTips}
+            placeholder={t('library.tipsPlaceholder')}
+            placeholderTextColor={colors.textMuted}
+            selectionColor={colors.accent}
+            multiline
+            numberOfLines={3}
+            textAlignVertical="top"
+            style={[styles.input, styles.notesInput]}
+          />
 
           <Text style={styles.label}>{t('library.customNotes')}</Text>
           <TextInput

@@ -9,6 +9,7 @@ import DraggableFlatList, {
   ScaleDecorator,
 } from 'react-native-draggable-flatlist';
 
+import { BannerAd } from '@/components/BannerAd';
 import { BottomSheet } from '@/components/BottomSheet';
 import { Icon } from '@/components/Icon';
 import { Pill } from '@/components/Pill';
@@ -37,7 +38,7 @@ export function WorkoutsScreen() {
   const { t } = useTranslation();
   const { colors, gradients } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const { workouts, sessions, deleteWorkout, reorderWorkouts } = useWorkouts();
+  const { workouts, sessions, deleteWorkout, duplicateWorkout, reorderWorkouts } = useWorkouts();
 
   const [typeSheet, setTypeSheet] = useState(false);
 
@@ -77,6 +78,14 @@ export function WorkoutsScreen() {
     const id = menuWorkout?.id;
     closeMenu();
     if (id) deleteWorkout(id);
+  };
+
+  const duplicateFromMenu = () => {
+    const workout = menuWorkout;
+    closeMenu();
+    if (workout) {
+      duplicateWorkout(workout.id, t('workouts.copyName', { name: workout.name }));
+    }
   };
 
   const renderCard = ({ item: w, drag, isActive, getIndex }: RenderItemParams<Workout>) => {
@@ -154,6 +163,7 @@ export function WorkoutsScreen() {
               {t('workouts.subtitle', { count: workouts.length })}
               {workouts.length > 1 ? t('workouts.dragHint') : ''}
             </Text>
+            <BannerAd />
           </View>
         }
         ListEmptyComponent={
@@ -278,6 +288,20 @@ export function WorkoutsScreen() {
               <View style={styles.optionInfo}>
                 <Text style={styles.optionTitle}>{t('workouts.editTitle')}</Text>
                 <Text style={styles.optionDesc}>{t('workouts.editDesc')}</Text>
+              </View>
+              <Icon name="chevron-right" size={20} color={colors.textMuted} />
+            </Pressable>
+
+            <Pressable
+              style={({ pressed }) => [styles.option, pressed && styles.optionPressed]}
+              onPress={duplicateFromMenu}
+            >
+              <View style={styles.optionIcon}>
+                <Icon name="copy" size={22} color={colors.accent} />
+              </View>
+              <View style={styles.optionInfo}>
+                <Text style={styles.optionTitle}>{t('workouts.duplicateTitle')}</Text>
+                <Text style={styles.optionDesc}>{t('workouts.duplicateDesc')}</Text>
               </View>
               <Icon name="chevron-right" size={20} color={colors.textMuted} />
             </Pressable>

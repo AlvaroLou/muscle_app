@@ -96,35 +96,35 @@ export function ExerciseDetailScreen() {
           <Pill label={t(`levels.${exercise.level}`)} />
         </View>
 
-        {exercise.secondaryMuscles.length > 0 ? (
-          <View style={styles.block}>
-            <Text style={styles.blockLabel}>{t('library.secondaryMuscles')}</Text>
-            <Text style={styles.blockText}>
-              {exercise.secondaryMuscles.map((m) => t(`muscleGroups.${m}`)).join(', ')}
-            </Text>
-          </View>
-        ) : null}
+        <View style={styles.block}>
+          <Text style={styles.blockLabel}>{t('library.secondaryMuscles')}</Text>
+          <Text style={exercise.secondaryMuscles.length > 0 ? styles.blockText : styles.blockEmpty}>
+            {exercise.secondaryMuscles.length > 0
+              ? exercise.secondaryMuscles.map((m) => t(`muscleGroups.${m}`)).join(', ')
+              : t('library.notProvided')}
+          </Text>
+        </View>
 
-        {instructions ? (
-          <View style={styles.block}>
-            <Text style={styles.blockLabel}>{t('library.instructions')}</Text>
-            <Text style={styles.blockText}>{instructions}</Text>
-          </View>
-        ) : null}
+        <View style={styles.block}>
+          <Text style={styles.blockLabel}>{t('library.instructions')}</Text>
+          <Text style={instructions ? styles.blockText : styles.blockEmpty}>
+            {instructions || t('library.notProvided')}
+          </Text>
+        </View>
 
-        {tips ? (
-          <View style={styles.block}>
-            <Text style={styles.blockLabel}>{t('library.tips')}</Text>
-            <Text style={styles.blockText}>{tips}</Text>
-          </View>
-        ) : null}
+        <View style={styles.block}>
+          <Text style={styles.blockLabel}>{t('library.tips')}</Text>
+          <Text style={tips ? styles.blockText : styles.blockEmpty}>
+            {tips || t('library.notProvided')}
+          </Text>
+        </View>
 
-        {notes ? (
-          <View style={styles.block}>
-            <Text style={styles.blockLabel}>{t('library.notes')}</Text>
-            <Text style={styles.blockText}>{notes}</Text>
-          </View>
-        ) : null}
+        <View style={styles.block}>
+          <Text style={styles.blockLabel}>{t('library.notes')}</Text>
+          <Text style={notes ? styles.blockText : styles.blockEmpty}>
+            {notes || t('library.notProvided')}
+          </Text>
+        </View>
 
         {/* Custom actions */}
         {exercise.isCustom ? (
@@ -277,6 +277,13 @@ const makeStyles = (colors: ThemeColors) =>
       fontFamily: fonts.body,
       fontSize: 15,
       lineHeight: 22,
+    },
+    blockEmpty: {
+      color: colors.textMuted,
+      fontFamily: fonts.body,
+      fontSize: 15,
+      lineHeight: 22,
+      fontStyle: 'italic',
     },
     actions: {
       flexDirection: 'row',

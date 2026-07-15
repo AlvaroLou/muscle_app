@@ -17,9 +17,11 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import '@/i18n';
+import { AdsProvider } from '@/ads/AdsProvider';
 import { RootNavigator } from '@/navigation';
 import { ExerciseLibraryProvider } from '@/store/ExerciseLibraryStore';
 import { PreferencesProvider } from '@/store/PreferencesStore';
+import { PremiumProvider } from '@/store/PremiumStore';
 import { WorkoutProvider } from '@/store/WorkoutStore';
 import { ThemeProvider, useTheme } from '@/theme/ThemeProvider';
 import { colors } from '@/theme';
@@ -70,14 +72,18 @@ export default function App() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <PreferencesProvider>
-          <ThemeProvider>
-            <ExerciseLibraryProvider>
-              <WorkoutProvider>
-                <ThemedNavigation />
-                <StatusBar style="light" />
-              </WorkoutProvider>
-            </ExerciseLibraryProvider>
-          </ThemeProvider>
+          <PremiumProvider>
+            <AdsProvider>
+              <ThemeProvider>
+                <ExerciseLibraryProvider>
+                  <WorkoutProvider>
+                    <ThemedNavigation />
+                    <StatusBar style="light" />
+                  </WorkoutProvider>
+                </ExerciseLibraryProvider>
+              </ThemeProvider>
+            </AdsProvider>
+          </PremiumProvider>
         </PreferencesProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

@@ -2,18 +2,22 @@ import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useAds } from '@/ads/AdsProvider';
 import { ConfirmSheet } from '@/components/ConfirmSheet';
 import { GradientButton } from '@/components/GradientButton';
 import { Icon } from '@/components/Icon';
 import { ProgressBar } from '@/components/ProgressBar';
 import { RestTimer } from '@/components/RestTimer';
-import { DEFAULT_REST_SECONDS, useWorkoutSession } from '@/hooks/useWorkoutSession';
+import { useWorkoutSession } from '@/hooks/useWorkoutSession';
 import { activeSessionRepository } from '@/repositories/activeSessionRepository';
+import { restSeconds } from '@/services/rest';
+import { usePreferences } from '@/store/PreferencesStore';
 import { useWorkouts } from '@/store/WorkoutStore';
+import { buildSessionStats } from '@/utils/sessionSummary';
 import { ActiveSession, Workout } from '@/types';
 import { fonts, ThemeColors } from '@/theme';
 import { useTheme } from '@/theme/ThemeProvider';
@@ -87,18 +91,24 @@ function RunningSession({
   const { t } = useTranslation();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { restDurations } = usePreferences();
+  const ads = useAds();
   const { workouts, logSession, saveActiveSession, clearActiveSession } = useWorkouts();
   const session = useWorkoutSession(workout, initial);
   // `seconds` = duração do descanso; `nonce` incrementa a cada série concluída
   // para reabrir o contador mesmo com tempos iguais.
   const [rest, setRest] = useState<{ seconds: number; nonce: number } | null>(null);
   const [quitOpen, setQuitOpen] = useState(false);
+  const [rewardMsg, setRewardMsg] = useState<string | null>(null);
   const logged = useRef(false);
   // true quando o treino foi finalizado ou descartado: não regravar em 2º plano.
   const endedRef = useRef(false);
   // true quando o descanso aberto foi da última série do exercício: ao encerrar
   // o descanso (pular ou tempo acabar), avança automaticamente para o próximo.
   const advanceRef = useRef(false);
+  // true quando o descanso aberto foi da última série do último exercício: ao
+  // encerrar o descanso, finaliza o treino automaticamente.
+  const finishRef = useRef(false);
 
   const {
     elapsedMs,
@@ -108,6 +118,8 @@ function RunningSession({
     progress,
     completedSets,
     completedSetKeys,
+    setWeights,
+    setSetWeight,
     totalSets,
     totalExercises,
     nextExerciseName,
@@ -140,6 +152,7 @@ function RunningSession({
     order,
     currentExerciseIndex,
     completedSetKeys,
+    setWeights,
     accumulatedMs: elapsedMs,
     lastResumeAt: running ? Date.now() : null,
     running,
@@ -172,14 +185,24 @@ function RunningSession({
     if (finished && !logged.current) {
       logged.current = true;
       endedRef.current = true;
+      const stats = buildSessionStats(workout, completedSetKeys, restDurations, setWeights);
       logSession({
         workoutId: workout.id,
         workoutName: workout.name,
         groupId,
         order,
         durationMs: elapsedMs,
-        completedSets,
-        totalSets,
+        startedAt: Date.now() - elapsedMs,
+        completedSets: stats.completedSets,
+        totalSets: stats.totalSets,
+        completedExercises: stats.completedExercises,
+        totalExercises: stats.totalExercises,
+        totalReps: stats.totalReps,
+        totalVolume: stats.totalVolume,
+        totalRestMs: stats.totalRestMs,
+        restCount: stats.restCount,
+        skippedExercises: stats.skippedExercises,
+        exercises: stats.exercises,
       });
       clearActiveSession();
     }
@@ -189,34 +212,73 @@ function RunningSession({
     groupId,
     order,
     elapsedMs,
-    completedSets,
-    totalSets,
+    completedSetKeys,
+    setWeights,
+    restDurations,
     logSession,
     clearActiveSession,
   ]);
+
+  // Rascunho de texto por série durante a digitação (preserva "40." e vírgula);
+  // o valor numérico já é gravado na sessão a cada tecla.
+  const [weightDrafts, setWeightDrafts] = useState<Record<string, string>>({});
+  const parseWeight = (txt: string) => {
+    const n = parseFloat(txt.replace(',', '.'));
+    return Number.isNaN(n) || n < 0 ? 0 : n;
+  };
+  const weightValueOf = (setIndex: number, weight: number) => {
+    const key = `${currentExercise.id}:${setIndex}`;
+    if (key in weightDrafts) return weightDrafts[key];
+    return weight > 0 ? String(weight) : '';
+  };
+  const handleWeightChange = (setIndex: number, txt: string) => {
+    const key = `${currentExercise.id}:${setIndex}`;
+    setWeightDrafts((prev) => ({ ...prev, [key]: txt }));
+    setSetWeight(currentExercise.id, setIndex, parseWeight(txt));
+  };
+  const clearWeightDraft = (setIndex: number) => {
+    const key = `${currentExercise.id}:${setIndex}`;
+    setWeightDrafts((prev) => {
+      if (!(key in prev)) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  };
 
   const handleToggleSet = (set: { setIndex: number; completed: boolean }) => {
     toggleSet(currentExercise.id, set.setIndex);
     // Se a série estava incompleta, agora está sendo concluída → abre o descanso.
     // (Usamos o estado atual do render; o retorno do setState não é síncrono.)
     if (!set.completed) {
-      // Última série do exercício (e há próximo) → avança ao fim do descanso.
       const isLastSet = set.setIndex === currentExerciseSets.length - 1;
+      // Última série do exercício: avança para o próximo ao fim do descanso; se
+      // for também o último exercício, finaliza o treino automaticamente.
       advanceRef.current = isLastSet && !isLastExercise;
+      finishRef.current = isLastSet && isLastExercise;
       setRest((prev) => ({
-        seconds: currentExercise.rest || DEFAULT_REST_SECONDS,
+        seconds: restSeconds(currentExercise, restDurations),
         nonce: (prev?.nonce ?? 0) + 1,
       }));
     }
   };
 
-  // Encerra o descanso (pular ou tempo acabar). Se foi a última série do
-  // exercício, passa para o próximo automaticamente.
+  // Encerra o descanso (pular ou tempo acabar). Avança para o próximo exercício
+  // ou finaliza o treino automaticamente, conforme a série concluída.
   const handleRestDismiss = () => {
     setRest(null);
+    if (finishRef.current) {
+      finishRef.current = false;
+      advanceRef.current = false;
+      finish();
+      return;
+    }
     if (advanceRef.current) {
       advanceRef.current = false;
-      nextExercise();
+      // Exercício concluído → intersticial (se a frequência permitir) ANTES de
+      // abrir o próximo. Se não houver anúncio, segue imediatamente.
+      ads.notifyExerciseCompleted();
+      void ads.maybeShowInterstitial().finally(() => nextExercise());
     }
   };
 
@@ -224,6 +286,13 @@ function RunningSession({
     endedRef.current = true; // evita gravar snapshot no unmount
     clearActiveSession();
     navigation.goBack();
+  };
+
+  // Recompensado opt-in ao concluir o treino: assistir libera 30 min sem
+  // intersticiais. Recusar mantém tudo funcionando normalmente.
+  const watchRewarded = async () => {
+    const earned = await ads.showRewarded();
+    setRewardMsg(earned ? t('active.adThanks') : t('active.adUnavailable'));
   };
 
   // ----- Resumo ao finalizar -----
@@ -249,6 +318,19 @@ function RunningSession({
               <Text style={styles.summaryLabel}>{t('summary.setsDone')}</Text>
             </View>
           </View>
+          {!ads.isPro && ads.ready ? (
+            rewardMsg ? (
+              <Text style={styles.rewardMsg}>{rewardMsg}</Text>
+            ) : (
+              <Pressable
+                onPress={watchRewarded}
+                style={({ pressed }) => [styles.rewardBtn, pressed && { opacity: 0.7 }]}
+              >
+                <Icon name="star" size={16} color={colors.accent} />
+                <Text style={styles.rewardBtnText}>{t('active.watchAd')}</Text>
+              </Pressable>
+            )
+          ) : null}
           <View style={{ alignSelf: 'stretch', marginTop: 24 }}>
             <GradientButton label={t('active.done')} onPress={() => navigation.goBack()} />
           </View>
@@ -341,6 +423,9 @@ function RunningSession({
             ? ` · ${t('details.weightKg', { weight: currentExercise.weight })}`
             : ` · ${t('details.bodyweight')}`}
         </Text>
+        {currentExercise.instructions?.trim() ? (
+          <Text style={styles.exerciseDesc}>{currentExercise.instructions.trim()}</Text>
+        ) : null}
         {currentExercise.description?.trim() ? (
           <Text style={styles.exerciseDesc}>{currentExercise.description.trim()}</Text>
         ) : null}
@@ -349,19 +434,39 @@ function RunningSession({
           {currentExerciseSets.map((set) => {
             const done = set.completed;
             return (
-              <Pressable
+              <View
                 key={set.setIndex}
-                onPress={() => handleToggleSet(set)}
                 style={[styles.setRow, done && styles.setRowDone]}
               >
-                <View style={[styles.checkbox, done && styles.checkboxDone]}>
-                  {done ? <Icon name="check" size={16} color={colors.onAccent} /> : null}
+                <Pressable
+                  onPress={() => handleToggleSet(set)}
+                  style={styles.setToggle}
+                  hitSlop={6}
+                >
+                  <View style={[styles.checkbox, done && styles.checkboxDone]}>
+                    {done ? <Icon name="check" size={16} color={colors.onAccent} /> : null}
+                  </View>
+                  <Text style={[styles.setLabel, done && styles.setLabelDone]}>
+                    {t('active.setLabel', { n: set.setIndex + 1 })}
+                  </Text>
+                </Pressable>
+                <View style={styles.weightField}>
+                  <TextInput
+                    value={weightValueOf(set.setIndex, set.weight)}
+                    onChangeText={(txt) => handleWeightChange(set.setIndex, txt)}
+                    onBlur={() => clearWeightDraft(set.setIndex)}
+                    keyboardType="numeric"
+                    placeholder="0"
+                    placeholderTextColor={colors.textMuted}
+                    selectionColor={colors.accent}
+                    style={styles.weightInput}
+                  />
+                  <Text style={styles.weightUnit}>{t('active.kg')}</Text>
                 </View>
-                <Text style={[styles.setLabel, done && styles.setLabelDone]}>
-                  {t('active.setLabel', { n: set.setIndex + 1 })}
+                <Text style={styles.setTarget}>
+                  {t('active.reps', { reps: currentExercise.reps })}
                 </Text>
-                <Text style={styles.setTarget}>{t('active.reps', { reps: currentExercise.reps })}</Text>
-              </Pressable>
+              </View>
             );
           })}
         </View>
@@ -558,11 +663,17 @@ const makeStyles = (colors: ThemeColors) =>
     borderRadius: 14,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
   },
   setRowDone: {
     backgroundColor: colors.accentTintSoft,
     borderColor: colors.accentBorder,
+  },
+  setToggle: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   checkbox: {
     width: 26,
@@ -587,6 +698,31 @@ const makeStyles = (colors: ThemeColors) =>
   setLabelDone: {
     color: colors.textSecondary,
     textDecorationLine: 'line-through',
+  },
+  weightField: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.inputAlt,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginRight: 10,
+  },
+  weightInput: {
+    minWidth: 40,
+    color: colors.text,
+    fontFamily: fonts.mono,
+    fontSize: 15,
+    textAlign: 'right',
+    padding: 0,
+  },
+  weightUnit: {
+    color: colors.textMuted,
+    fontFamily: fonts.mono,
+    fontSize: 12,
   },
   setTarget: {
     color: colors.textMuted,
@@ -665,5 +801,30 @@ const makeStyles = (colors: ThemeColors) =>
     alignSelf: 'stretch',
     backgroundColor: colors.border,
     marginHorizontal: 12,
+  },
+  rewardBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    alignSelf: 'stretch',
+    marginTop: 20,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.accentBorder,
+    backgroundColor: colors.accentTintSofter,
+  },
+  rewardBtnText: {
+    color: colors.accent,
+    fontFamily: fonts.bodyBold,
+    fontSize: 14,
+  },
+  rewardMsg: {
+    color: colors.textSecondary,
+    fontFamily: fonts.body,
+    fontSize: 13,
+    textAlign: 'center',
+    marginTop: 20,
   },
 });
