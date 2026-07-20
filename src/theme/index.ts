@@ -15,8 +15,22 @@ function rgba(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-/** Cores neutras — iguais em todos os temas (base escura). */
-const neutral = {
+/** Escurece um hex por um fator (0..1). Usado p/ derivar o accentDim de cores custom. */
+export function darken(hex: string, amount: number): string {
+  const h = hex.replace('#', '');
+  const f = Math.max(0, 1 - amount);
+  const to = (i: number) =>
+    Math.round(parseInt(h.slice(i, i + 2), 16) * f)
+      .toString(16)
+      .padStart(2, '0');
+  return `#${to(0)}${to(2)}${to(4)}`;
+}
+
+/** Base de superfície: escura ou clara. */
+export type ThemeBase = 'dark' | 'light';
+
+/** Cores neutras da base ESCURA. */
+const darkNeutral = {
   // fundos
   bg: '#121212',
   bgDeep: '#0a0a0a',
@@ -58,7 +72,48 @@ const neutral = {
   white15: 'rgba(255,255,255,0.15)',
 
   navBar: '#181818',
-} as const;
+};
+
+/** Cores neutras da base CLARA (mesmas chaves; superfícies claras + texto escuro). */
+const lightNeutral: typeof darkNeutral = {
+  bg: '#f4f4f6',
+  bgDeep: '#e9e9ee',
+  card: '#ffffff',
+  cardAlt: '#f3f3f6',
+  inputAlt: '#ececf0',
+  onAccent: '#0a0a0a',
+
+  blue: '#2f7fe0',
+  orange: '#e8642a',
+  danger: '#e2372c',
+
+  text: '#161618',
+  textDim: '#33333a',
+  textDim2: '#55555e',
+  textSecondary: '#6b6b75',
+  textMuted: '#9a9aa4',
+  textFaint: '#c2c2ca',
+  handle: '#c9c9d0',
+
+  border: 'rgba(0,0,0,0.08)',
+  borderSoft: 'rgba(0,0,0,0.06)',
+  borderStrong: 'rgba(0,0,0,0.1)',
+  borderInput: 'rgba(0,0,0,0.12)',
+  divider: 'rgba(0,0,0,0.06)',
+
+  blueTint: 'rgba(47,127,224,0.14)',
+  orangeTint: 'rgba(232,100,42,0.14)',
+
+  white04: 'rgba(0,0,0,0.03)',
+  white05: 'rgba(0,0,0,0.04)',
+  white06: 'rgba(0,0,0,0.05)',
+  white07: 'rgba(0,0,0,0.06)',
+  white15: 'rgba(0,0,0,0.12)',
+
+  navBar: '#ffffff',
+};
+
+const neutralFor = (base: ThemeBase) => (base === 'light' ? lightNeutral : darkNeutral);
 
 /** Definição mínima de cada preset: o accent e sua variação escura. */
 export interface ThemeDef {
@@ -73,11 +128,18 @@ export const THEME_DEFS: Record<ThemeId, ThemeDef> = {
   green: { id: 'green', accent: '#20c95a', accentDim: '#12984a' },
 };
 
-/** Monta a paleta completa a partir de um accent. */
-export function buildColors(def: ThemeDef) {
+/** Paleta do color picker Pro (presets primeiro + variações de matiz). */
+export const CUSTOM_ACCENTS = [
+  '#ff149d', '#3996ff', '#20c95a',
+  '#ff3b30', '#ff7839', '#ffb300', '#ffd400', '#8bd450',
+  '#00c2a8', '#00b4d8', '#7b61ff', '#b14bff', '#ff5fa2', '#ff2d55',
+] as const;
+
+/** Monta a paleta completa a partir de um accent e da base (escura/clara). */
+export function buildColors(def: ThemeDef, base: ThemeBase = 'dark') {
   const { accent, accentDim } = def;
   return {
-    ...neutral,
+    ...neutralFor(base),
     accent,
     accentDim,
     accentGreen: accentDim,
@@ -94,12 +156,15 @@ export function buildColors(def: ThemeDef) {
   };
 }
 
-export function buildGradients(def: ThemeDef) {
+export function buildGradients(def: ThemeDef, base: ThemeBase = 'dark') {
+  const light = base === 'light';
   return {
-    accent: [def.accent, def.accentDim] as const,
-    accentAvatar: [def.accent, def.accentDim] as const,
-    card: ['#1e1e1e', '#242424'] as const,
-    exercisePlaceholder: ['#2a2a2a', '#222222'] as const,
+    accent: [def.accent, def.accentDim] as [string, string],
+    accentAvatar: [def.accent, def.accentDim] as [string, string],
+    card: (light ? ['#ffffff', '#f3f3f6'] : ['#1e1e1e', '#242424']) as [string, string],
+    exercisePlaceholder: (light
+      ? ['#ececf0', '#e2e2e8']
+      : ['#2a2a2a', '#222222']) as [string, string],
   };
 }
 

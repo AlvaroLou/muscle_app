@@ -9,13 +9,38 @@
  *
  * Nenhum outro arquivo deve importar o pacote diretamente — sempre via aqui.
  */
+import { NativeModules, TurboModuleRegistry } from 'react-native';
+
 type AdmobNamespace = typeof import('react-native-google-mobile-ads');
 
 let cached: AdmobNamespace | null | undefined;
 
+/**
+ * O módulo nativo do AdMob está registrado neste binário? Usa
+ * `TurboModuleRegistry.get` (NÃO lança, ao contrário de `getEnforcing`) e o
+ * bridge antigo como fallback. No Expo Go retorna false — e aí nem importamos o
+ * pacote, evitando o Invariant Violation que ele dispara ao tocar no nativo.
+ */
+function nativeModulePresent(): boolean {
+  try {
+    const fromTurbo =
+      typeof TurboModuleRegistry?.get === 'function' &&
+      TurboModuleRegistry.get('RNGoogleMobileAdsModule') != null;
+    const fromBridge = (NativeModules as Record<string, unknown>)
+      .RNGoogleMobileAdsModule != null;
+    return fromTurbo || fromBridge;
+  } catch {
+    return false;
+  }
+}
+
 /** Retorna o namespace do AdMob, ou null se o módulo nativo não estiver presente. */
 export function getAdmob(): AdmobNamespace | null {
   if (cached !== undefined) return cached;
+  if (!nativeModulePresent()) {
+    cached = null;
+    return cached;
+  }
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     cached = require('react-native-google-mobile-ads') as AdmobNamespace;

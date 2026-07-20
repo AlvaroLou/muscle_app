@@ -36,6 +36,8 @@ export type IconName =
   | 'copy'
   | 'filter'
   | 'info'
+  | 'chart'
+  | 'share'
   | 'book';
 
 interface Props {
@@ -68,6 +70,8 @@ const FEATHER: Partial<Record<IconName, keyof typeof Feather.glyphMap>> = {
   copy: 'copy',
   filter: 'filter',
   info: 'info',
+  chart: 'bar-chart-2',
+  share: 'share-2',
   book: 'book-open',
 };
 

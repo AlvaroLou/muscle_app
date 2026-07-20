@@ -1,18 +1,19 @@
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { BannerAd } from '@/components/BannerAd';
+import { ColorPicker } from '@/components/ColorPicker';
 import { Header } from '@/components/Header';
 import { Icon } from '@/components/Icon';
 import { Screen } from '@/components/Screen';
-import { LanguageCode, ThemeId } from '@/repositories/preferencesRepository';
+import { LanguageCode, ThemeId, ThemeMode } from '@/repositories/preferencesRepository';
 import { REST_TYPES } from '@/services/rest';
 import { usePreferences } from '@/store/PreferencesStore';
 import { usePremium } from '@/store/PremiumStore';
-import { fonts, THEME_DEFS, ThemeColors } from '@/theme';
+import { CUSTOM_ACCENTS, fonts, THEME_DEFS, ThemeColors } from '@/theme';
 import { useTheme } from '@/theme/ThemeProvider';
 import { RootStackParamList } from '@/navigation/types';
 
@@ -23,9 +24,41 @@ export function SettingsScreen() {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const { language, themeId, restDurations, setLanguage, setThemeId, setRestDuration } =
-    usePreferences();
-  const { isPro, setDevPro } = usePremium();
+  const {
+    language,
+    themeId,
+    themeMode,
+    customAccent,
+    restDurations,
+    setLanguage,
+    setThemeId,
+    setThemeMode,
+    setCustomAccent,
+    setRestDuration,
+  } = usePreferences();
+  const { isPro, entitlement, restorePurchase, setDevPro } = usePremium();
+
+  const activeAccent = (customAccent ?? THEME_DEFS[themeId].accent).toLowerCase();
+  const themeModes: ThemeMode[] = ['light', 'dark', 'auto'];
+
+  // Trava o scroll enquanto o usuário arrasta na área de cor (senão o gesto
+  // vertical rola a página em vez de mover a seleção de cor).
+  const [scrollEnabled, setScrollEnabled] = useState(true);
+
+  // TODO: trocar pelo e-mail de suporte real antes de publicar.
+  const SUPPORT_EMAIL = 'support@muscleapp.app';
+
+  const licenseStatus = isPro
+    ? entitlement.licenseType
+      ? t(`settings.license.${entitlement.licenseType}`)
+      : t('settings.license.lifetime')
+    : t('settings.license.free');
+
+  const contactSupport = () => {
+    void Linking.openURL(
+      `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('Muscle App')}`,
+    );
+  };
 
   const languages: { id: LanguageCode; label: string }[] = [
     { id: 'en', label: t('settings.languageEnglish') },
@@ -43,7 +76,11 @@ export function SettingsScreen() {
       <Header title={t('settings.title')} onBack={() => navigation.goBack()} />
       <BannerAd />
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+      <ScrollView
+        scrollEnabled={scrollEnabled}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.content}
+      >
         {/* Language */}
         <Text style={styles.sectionLabel}>{t('settings.general')}</Text>
         <View style={styles.card}>
@@ -95,6 +132,78 @@ export function SettingsScreen() {
           ))}
         </View>
 
+        {/* Premium themes: modo (claro/escuro/auto) + cor de destaque livre */}
+        <Text style={styles.sectionLabel}>{t('settings.premiumThemes')}</Text>
+        {isPro ? (
+          <>
+            <View style={styles.card}>
+              <View style={styles.rowHeader}>
+                <Icon name="settings" size={16} color={colors.accent} />
+                <Text style={styles.rowHeaderText}>{t('settings.themeMode')}</Text>
+              </View>
+              <View style={styles.modeRow}>
+                {themeModes.map((m) => {
+                  const active = themeMode === m;
+                  return (
+                    <Pressable
+                      key={m}
+                      onPress={() => setThemeMode(m)}
+                      style={[styles.modeChip, active && styles.modeChipActive]}
+                    >
+                      <Text style={[styles.modeChipText, active && styles.modeChipTextActive]}>
+                        {t(`settings.mode.${m}`)}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+
+            <View style={styles.card}>
+              <View style={styles.rowHeader}>
+                <Icon name="star-filled" size={16} color={colors.accent} />
+                <Text style={styles.rowHeaderText}>{t('settings.accentColor')}</Text>
+              </View>
+              <View style={styles.swatchGrid}>
+                {CUSTOM_ACCENTS.map((hex) => {
+                  const active = activeAccent === hex.toLowerCase();
+                  return (
+                    <Pressable
+                      key={hex}
+                      onPress={() => setCustomAccent(hex)}
+                      style={[
+                        styles.pickerSwatch,
+                        { backgroundColor: hex },
+                        active && styles.swatchActive,
+                      ]}
+                    >
+                      {active ? <Icon name="check" size={16} color="#ffffff" /> : null}
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <ColorPicker
+                value={activeAccent}
+                onChange={setCustomAccent}
+                onInteractStart={() => setScrollEnabled(false)}
+                onInteractEnd={() => setScrollEnabled(true)}
+              />
+            </View>
+          </>
+        ) : (
+          <Pressable
+            onPress={() => navigation.navigate('Premium')}
+            style={({ pressed }) => [styles.card, styles.lockCard, pressed && styles.pressed]}
+          >
+            <Icon name="star" size={16} color={colors.accent} />
+            <View style={styles.optionLabelFlex}>
+              <Text style={styles.optionLabel}>{t('settings.unlockThemes')}</Text>
+              <Text style={styles.proStatus}>{t('settings.unlockThemesDesc')}</Text>
+            </View>
+            <Icon name="chevron-right" size={20} color={colors.textMuted} />
+          </Pressable>
+        )}
+
         {/* Workout preferences: rest durations */}
         <Text style={styles.sectionLabel}>{t('settings.workoutPrefs')}</Text>
         <View style={styles.card}>
@@ -130,14 +239,54 @@ export function SettingsScreen() {
         </View>
         <Text style={styles.hint}>{t('settings.restDurationsHint')}</Text>
 
-        {/* Premium (toggle de desenvolvimento — enquanto não há billing) */}
+        {/* Premium: status da licença, upgrade, restaurar, suporte */}
         <Text style={styles.sectionLabel}>{t('settings.premium')}</Text>
+        <View style={styles.card}>
+          <Pressable
+            onPress={() => navigation.navigate('Premium')}
+            style={({ pressed }) => [styles.option, pressed && styles.pressed]}
+          >
+            <Icon name={isPro ? 'star-filled' : 'star'} size={16} color={colors.accent} />
+            <View style={styles.optionLabelFlex}>
+              <Text style={styles.optionLabel}>
+                {isPro ? t('settings.proActive') : t('settings.upgradeToPro')}
+              </Text>
+              <Text style={styles.proStatus}>
+                {isPro ? licenseStatus : t('settings.upgradeDesc')}
+              </Text>
+            </View>
+            <Icon name="chevron-right" size={20} color={colors.textMuted} />
+          </Pressable>
+
+          <Pressable
+            onPress={restorePurchase}
+            style={({ pressed }) => [styles.option, styles.optionBorder, pressed && styles.pressed]}
+          >
+            <Icon name="history" size={16} color={colors.accent} />
+            <Text style={[styles.optionLabel, styles.optionLabelFlex]}>
+              {t('settings.restore')}
+            </Text>
+          </Pressable>
+
+          <Pressable
+            onPress={contactSupport}
+            style={({ pressed }) => [styles.option, styles.optionBorder, pressed && styles.pressed]}
+          >
+            <Icon name="globe" size={16} color={colors.accent} />
+            <Text style={[styles.optionLabel, styles.optionLabelFlex]}>
+              {t('settings.support')}
+            </Text>
+            <Icon name="chevron-right" size={20} color={colors.textMuted} />
+          </Pressable>
+        </View>
+
+        {/* Toggle de desenvolvimento — enquanto não há billing real */}
         <View style={styles.card}>
           <Pressable
             onPress={() => setDevPro(!isPro)}
             style={({ pressed }) => [styles.option, pressed && styles.pressed]}
           >
-            <Icon name="star" size={16} color={colors.accent} />
+            <Icon name="settings" size={16} color={colors.accent} />
             <View style={styles.optionLabelFlex}>
               <Text style={styles.optionLabel}>{t('settings.proMode')}</Text>
               <Text style={styles.proStatus}>
@@ -244,6 +393,56 @@ const makeStyles = (colors: ThemeColors) =>
       width: 20,
       height: 20,
       borderRadius: 6,
+    },
+    lockCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingVertical: 14,
+    },
+    modeRow: {
+      flexDirection: 'row',
+      gap: 8,
+      paddingVertical: 12,
+    },
+    modeChip: {
+      flex: 1,
+      alignItems: 'center',
+      paddingVertical: 10,
+      borderRadius: 10,
+      backgroundColor: colors.inputAlt,
+      borderWidth: 1,
+      borderColor: colors.borderStrong,
+    },
+    modeChipActive: {
+      backgroundColor: colors.accentTint,
+      borderColor: colors.accentBorder,
+    },
+    modeChipText: {
+      color: colors.textDim2,
+      fontFamily: fonts.bodyMed,
+      fontSize: 13,
+    },
+    modeChipTextActive: {
+      color: colors.accent,
+      fontFamily: fonts.bodyBold,
+    },
+    swatchGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 12,
+      paddingVertical: 14,
+    },
+    pickerSwatch: {
+      width: 44,
+      height: 44,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    swatchActive: {
+      borderWidth: 3,
+      borderColor: colors.text,
     },
     stepper: {
       flexDirection: 'row',

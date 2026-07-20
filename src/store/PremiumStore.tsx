@@ -8,24 +8,35 @@ import React, {
 } from 'react';
 
 import { DEFAULT_IS_PRO } from '@/ads/adConfig';
+import { billingService, Entitlement } from '@/premium/BillingService';
 import { premiumRepository } from '@/repositories/premiumRepository';
 
 /**
- * PremiumManager: fonte única do estado Pro. Hoje o valor vem de um override de
- * desenvolvimento persistido (ou do padrão da config); no futuro, do Google
- * Play Billing. Todo o resto do app (anúncios inclusive) só depende de `isPro`.
+ * PremiumManager: fonte ÚNICA do estado Pro. Carrega o direito salvo ao abrir,
+ * expõe `isPro` para todo o app e concentra compra/restauração via o
+ * `billingService` (hoje dev/placeholder; Google Play depois — sem mudar a UI).
  */
 interface PremiumValue {
   isPro: boolean;
   loading: boolean;
-  /** Override de dev (Settings) para testar Free vs Pro. */
+  /** Metadados da licença (tipo, data) para a tela de status. */
+  entitlement: Entitlement;
+  /** Loja real disponível? (habilita botões de compra reais no futuro) */
+  billingAvailable: boolean;
+  /** Inicia a compra vitalícia; resolve true se virou Pro. */
+  purchasePro: () => Promise<boolean>;
+  /** Restaura compra anterior; resolve true se recuperou Pro. */
+  restorePurchase: () => Promise<boolean>;
+  /** Override de dev (Settings) para testar Free vs Pro sem loja. */
   setDevPro: (value: boolean) => void;
 }
+
+const FREE: Entitlement = { pro: DEFAULT_IS_PRO };
 
 const PremiumContext = createContext<PremiumValue | undefined>(undefined);
 
 export function PremiumProvider({ children }: { children: React.ReactNode }) {
-  const [devPro, setDevProState] = useState<boolean | undefined>(undefined);
+  const [entitlement, setEntitlement] = useState<Entitlement>(FREE);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -33,7 +44,7 @@ export function PremiumProvider({ children }: { children: React.ReactNode }) {
     (async () => {
       const stored = await premiumRepository.get();
       if (!active) return;
-      setDevProState(stored.devPro);
+      if (stored.entitlement) setEntitlement(stored.entitlement);
       setLoading(false);
     })();
     return () => {
@@ -41,16 +52,40 @@ export function PremiumProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const setDevPro = useCallback((value: boolean) => {
-    setDevProState(value);
-    void premiumRepository.save({ devPro: value });
+  /** Aplica um novo direito: atualiza o estado e persiste. */
+  const apply = useCallback((next: Entitlement) => {
+    setEntitlement(next);
+    void premiumRepository.save({ entitlement: next });
   }, []);
 
-  const isPro = devPro ?? DEFAULT_IS_PRO;
+  const purchasePro = useCallback(async () => {
+    const ent = await billingService.purchaseLifetime();
+    apply(ent);
+    return ent.pro;
+  }, [apply]);
+
+  const restorePurchase = useCallback(async () => {
+    const ent = await billingService.restore();
+    if (ent) apply(ent);
+    return ent?.pro ?? false;
+  }, [apply]);
+
+  const setDevPro = useCallback(
+    (value: boolean) => apply({ pro: value, licenseType: 'dev' }),
+    [apply],
+  );
 
   const value = useMemo<PremiumValue>(
-    () => ({ isPro, loading, setDevPro }),
-    [isPro, loading, setDevPro],
+    () => ({
+      isPro: entitlement.pro,
+      loading,
+      entitlement,
+      billingAvailable: billingService.available,
+      purchasePro,
+      restorePurchase,
+      setDevPro,
+    }),
+    [entitlement, loading, purchasePro, restorePurchase, setDevPro],
   );
 
   return <PremiumContext.Provider value={value}>{children}</PremiumContext.Provider>;

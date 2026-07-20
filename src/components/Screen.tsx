@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, View, ViewStyle } from 'react-native';
 import { Edge, SafeAreaView } from 'react-native-safe-area-context';
 
-import { colors } from '@/theme';
+import { useTheme } from '@/theme/ThemeProvider';
 
 interface Props {
   children: React.ReactNode;
@@ -10,10 +10,11 @@ interface Props {
   style?: ViewStyle;
 }
 
-/** Casca de tela: fundo do tema + área segura. */
+/** Casca de tela: fundo do tema (reativo) + área segura. */
 export function Screen({ children, edges = ['top', 'left', 'right'], style }: Props) {
+  const { colors } = useTheme();
   return (
-    <SafeAreaView style={styles.safe} edges={edges}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: colors.bg }]} edges={edges}>
       <View style={[styles.inner, style]}>{children}</View>
     </SafeAreaView>
   );
@@ -22,7 +23,6 @@ export function Screen({ children, edges = ['top', 'left', 'right'], style }: Pr
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: colors.bg,
   },
   inner: {
     flex: 1,

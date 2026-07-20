@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { colors } from '@/theme';
+import { useTheme } from '@/theme/ThemeProvider';
 
 interface Props {
   visible: boolean;
@@ -16,6 +16,7 @@ interface Props {
  * `useNativeDriver`, então roda liso no Expo Go.
  */
 export function BottomSheet({ visible, onClose, children }: Props) {
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const [rendered, setRendered] = useState(visible);
   const anim = useRef(new Animated.Value(0)).current;
@@ -59,10 +60,15 @@ export function BottomSheet({ visible, onClose, children }: Props) {
       <Animated.View
         style={[
           styles.sheet,
-          { paddingBottom: insets.bottom + 16, transform: [{ translateY }] },
+          {
+            backgroundColor: colors.card,
+            borderColor: colors.border,
+            paddingBottom: insets.bottom + 16,
+            transform: [{ translateY }],
+          },
         ]}
       >
-        <View style={styles.handle} />
+        <View style={[styles.handle, { backgroundColor: colors.textFaint }]} />
         {children}
       </Animated.View>
     </Modal>
@@ -79,11 +85,9 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: colors.card,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     borderWidth: 1,
-    borderColor: colors.border,
     paddingTop: 12,
     paddingHorizontal: 20,
   },
@@ -92,7 +96,6 @@ const styles = StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: colors.textFaint,
     marginBottom: 16,
   },
 });

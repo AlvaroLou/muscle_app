@@ -28,7 +28,7 @@ import { colors } from '@/theme';
 
 // Container de navegação com o tema (accent) reativo ao preset ativo.
 function ThemedNavigation() {
-  const { colors: c } = useTheme();
+  const { colors: c, base } = useTheme();
   const navTheme = {
     ...DarkTheme,
     colors: {
@@ -44,6 +44,7 @@ function ThemedNavigation() {
   return (
     <NavigationContainer theme={navTheme}>
       <RootNavigator />
+      <StatusBar style={base === 'light' ? 'dark' : 'light'} />
     </NavigationContainer>
   );
 }
@@ -78,7 +79,6 @@ export default function App() {
                 <ExerciseLibraryProvider>
                   <WorkoutProvider>
                     <ThemedNavigation />
-                    <StatusBar style="light" />
                   </WorkoutProvider>
                 </ExerciseLibraryProvider>
               </ThemeProvider>

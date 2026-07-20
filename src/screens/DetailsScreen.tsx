@@ -16,10 +16,14 @@ import {
   ScaleDecorator,
 } from 'react-native-draggable-flatlist';
 
+import { BottomSheet } from '@/components/BottomSheet';
 import { GradientButton } from '@/components/GradientButton';
 import { Icon } from '@/components/Icon';
 import { Pill } from '@/components/Pill';
 import { Screen } from '@/components/Screen';
+import { exportWorkout, ExportFormat } from '@/premium/ExportService';
+import { usePreferences } from '@/store/PreferencesStore';
+import { usePremium } from '@/store/PremiumStore';
 import { useWorkouts } from '@/store/WorkoutStore';
 import { Exercise, ExerciseGroup } from '@/types';
 import { fonts, ThemeColors } from '@/theme';
@@ -39,6 +43,10 @@ export function DetailsScreen() {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const route = useRoute<RouteProp<WorkoutsStackParamList, 'Details'>>();
   const { workouts, reorderGroups, reorderExercises } = useWorkouts();
+  const { isPro } = usePremium();
+  const { restDurations } = usePreferences();
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   // Sem id (ex.: vindo da Home) cai no primeiro treino.
   const workoutId = route.params?.workoutId ?? workouts[0]?.id;
@@ -71,6 +79,26 @@ export function DetailsScreen() {
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
+
+  // Exportação (Pro): Free vai para a tela Premium; Pro escolhe PDF/TXT.
+  const openExport = () => {
+    if (!isPro) {
+      navigation.navigate('Premium');
+      return;
+    }
+    setExportOpen(true);
+  };
+  const runExport = async (format: ExportFormat) => {
+    setExportOpen(false);
+    setExporting(true);
+    try {
+      await exportWorkout(workout, format, t, restDurations);
+    } catch {
+      // falha silenciosa — não interrompe o app
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const renderGroup = ({
     item: group,
@@ -183,9 +211,14 @@ export function DetailsScreen() {
             {workout.name}
           </Text>
         </View>
-        <Pressable hitSlop={8} onPress={() => navigation.navigate('Create', { workoutId: workout.id })}>
-          <Text style={styles.edit}>{t('common.edit')}</Text>
-        </Pressable>
+        <View style={styles.rightActions}>
+          <Pressable hitSlop={8} onPress={openExport} disabled={exporting}>
+            <Icon name="share" size={20} color={colors.accent} />
+          </Pressable>
+          <Pressable hitSlop={8} onPress={() => navigation.navigate('Create', { workoutId: workout.id })}>
+            <Text style={styles.edit}>{t('common.edit')}</Text>
+          </Pressable>
+        </View>
       </View>
 
       <NestableScrollContainer
@@ -226,6 +259,40 @@ export function DetailsScreen() {
           onPress={() => navigation.navigate('ActiveWorkout', { workoutId: workout.id })}
         />
       </View>
+
+      {/* Escolha do formato de exportação (Pro) */}
+      <BottomSheet visible={exportOpen} onClose={() => setExportOpen(false)}>
+        <Text style={styles.exportTitle}>{t('export.title')}</Text>
+        <Text style={styles.exportSubtitle}>{t('export.subtitle')}</Text>
+
+        <Pressable
+          style={({ pressed }) => [styles.exportOption, pressed && styles.exportOptionPressed]}
+          onPress={() => runExport('pdf')}
+        >
+          <View style={styles.exportIcon}>
+            <Icon name="share" size={20} color={colors.accent} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.exportOptionTitle}>{t('export.pdf')}</Text>
+            <Text style={styles.exportOptionDesc}>{t('export.pdfDesc')}</Text>
+          </View>
+          <Icon name="chevron-right" size={20} color={colors.textMuted} />
+        </Pressable>
+
+        <Pressable
+          style={({ pressed }) => [styles.exportOption, pressed && styles.exportOptionPressed]}
+          onPress={() => runExport('txt')}
+        >
+          <View style={styles.exportIcon}>
+            <Icon name="book" size={20} color={colors.accent} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.exportOptionTitle}>{t('export.txt')}</Text>
+            <Text style={styles.exportOptionDesc}>{t('export.txtDesc')}</Text>
+          </View>
+          <Icon name="chevron-right" size={20} color={colors.textMuted} />
+        </Pressable>
+      </BottomSheet>
     </Screen>
   );
 }
@@ -279,11 +346,15 @@ const makeStyles = (colors: ThemeColors) =>
     fontFamily: fonts.heading,
     fontSize: 18,
   },
+  rightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
   edit: {
     color: colors.accent,
     fontFamily: fonts.bodyBold,
     fontSize: 14,
-    width: 70,
     textAlign: 'right',
   },
   content: {
@@ -439,5 +510,50 @@ const makeStyles = (colors: ThemeColors) =>
     backgroundColor: colors.bg,
     borderTopWidth: 1,
     borderTopColor: colors.border,
+  },
+  exportTitle: {
+    color: colors.text,
+    fontFamily: fonts.heading,
+    fontSize: 22,
+  },
+  exportSubtitle: {
+    color: colors.textSecondary,
+    fontFamily: fonts.body,
+    fontSize: 14,
+    marginTop: 2,
+    marginBottom: 16,
+  },
+  exportOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    backgroundColor: colors.bg,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    padding: 14,
+    marginBottom: 12,
+  },
+  exportOptionPressed: {
+    opacity: 0.7,
+  },
+  exportIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: colors.accentTint,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  exportOptionTitle: {
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 15,
+  },
+  exportOptionDesc: {
+    color: colors.textSecondary,
+    fontFamily: fonts.body,
+    fontSize: 12,
+    marginTop: 2,
   },
 });

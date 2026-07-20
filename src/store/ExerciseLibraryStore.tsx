@@ -8,7 +8,10 @@ import React, {
 } from 'react';
 
 import { STANDARD_EXERCISES } from '@/data/exerciseLibrary';
-import { exerciseLibraryRepository } from '@/repositories/exerciseLibraryRepository';
+import {
+  exerciseLibraryRepository,
+  ExerciseOverride,
+} from '@/repositories/exerciseLibraryRepository';
 import { Equipment, LibraryExercise, MuscleGroup, RestType } from '@/types';
 import { createId } from '@/utils/id';
 
@@ -21,6 +24,9 @@ export interface CustomExerciseInput {
   instructions?: string;
   tips?: string;
   notes?: string;
+  /** Vídeo demonstrativo (Pro) — uri local persistida. */
+  videoUri?: string;
+  thumbnailUri?: string;
 }
 
 interface ExerciseLibraryValue {
@@ -33,17 +39,23 @@ interface ExerciseLibraryValue {
   updateCustom: (id: string, input: CustomExerciseInput) => void;
   deleteCustom: (id: string) => void;
   duplicateCustom: (id: string) => void;
+  /** Edita um exercício PADRÃO (guarda um "override" de texto/mídia). */
+  updateStandard: (id: string, input: CustomExerciseInput) => void;
+  /** Remove o override de um exercício padrão (volta ao original traduzido). */
+  resetStandard: (id: string) => void;
   getById: (id: string) => LibraryExercise | undefined;
 }
 
 const ExerciseLibraryContext = createContext<ExerciseLibraryValue | undefined>(undefined);
 
-function customFields(input: CustomExerciseInput): LibraryExercise['custom'] {
+function customFields(input: CustomExerciseInput): ExerciseOverride {
   return {
     name: input.name.trim(),
     notes: input.notes?.trim() || undefined,
     instructions: input.instructions?.trim() || undefined,
     tips: input.tips?.trim() || undefined,
+    videoUri: input.videoUri || undefined,
+    thumbnailUri: input.thumbnailUri || undefined,
   };
 }
 
@@ -63,17 +75,20 @@ function toCustom(input: CustomExerciseInput): LibraryExercise {
 export function ExerciseLibraryProvider({ children }: { children: React.ReactNode }) {
   const [custom, setCustom] = useState<LibraryExercise[]>([]);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const [overrides, setOverrides] = useState<Record<string, ExerciseOverride>>({});
 
   useEffect(() => {
     let active = true;
     (async () => {
-      const [storedCustom, storedFavs] = await Promise.all([
+      const [storedCustom, storedFavs, storedOverrides] = await Promise.all([
         exerciseLibraryRepository.getCustom(),
         exerciseLibraryRepository.getFavorites(),
+        exerciseLibraryRepository.getOverrides(),
       ]);
       if (!active) return;
       setCustom(storedCustom);
       setFavorites(new Set(storedFavs));
+      setOverrides(storedOverrides);
     })();
     return () => {
       active = false;
@@ -90,7 +105,18 @@ export function ExerciseLibraryProvider({ children }: { children: React.ReactNod
     void exerciseLibraryRepository.saveFavorites([...next]);
   }, []);
 
-  const exercises = useMemo(() => [...custom, ...STANDARD_EXERCISES], [custom]);
+  const commitOverrides = useCallback((next: Record<string, ExerciseOverride>) => {
+    setOverrides(next);
+    void exerciseLibraryRepository.saveOverrides(next);
+  }, []);
+
+  // Aplica os overrides do usuário sobre os exercícios padrão (texto/mídia).
+  const exercises = useMemo(() => {
+    const standards = STANDARD_EXERCISES.map((ex) =>
+      overrides[ex.id] ? { ...ex, custom: overrides[ex.id] } : ex,
+    );
+    return [...custom, ...standards];
+  }, [custom, overrides]);
 
   const getById = useCallback(
     (id: string) => exercises.find((e) => e.id === id),
@@ -159,6 +185,23 @@ export function ExerciseLibraryProvider({ children }: { children: React.ReactNod
     [custom, commitCustom],
   );
 
+  const updateStandard = useCallback(
+    (id: string, input: CustomExerciseInput) => {
+      commitOverrides({ ...overrides, [id]: customFields(input) });
+    },
+    [overrides, commitOverrides],
+  );
+
+  const resetStandard = useCallback(
+    (id: string) => {
+      if (!overrides[id]) return;
+      const next = { ...overrides };
+      delete next[id];
+      commitOverrides(next);
+    },
+    [overrides, commitOverrides],
+  );
+
   const value = useMemo<ExerciseLibraryValue>(
     () => ({
       exercises,
@@ -169,6 +212,8 @@ export function ExerciseLibraryProvider({ children }: { children: React.ReactNod
       updateCustom,
       deleteCustom,
       duplicateCustom,
+      updateStandard,
+      resetStandard,
       getById,
     }),
     [
@@ -180,6 +225,8 @@ export function ExerciseLibraryProvider({ children }: { children: React.ReactNod
       updateCustom,
       deleteCustom,
       duplicateCustom,
+      updateStandard,
+      resetStandard,
       getById,
     ],
   );

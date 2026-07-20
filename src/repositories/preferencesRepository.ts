@@ -9,10 +9,16 @@ const STORAGE_KEY = '@workout_planner/preferences';
 
 export type LanguageCode = 'en' | 'pt-BR';
 export type ThemeId = 'dark' | 'blue' | 'green';
+/** Superfície do app (Pro): escuro, claro ou seguindo o sistema. */
+export type ThemeMode = 'dark' | 'light' | 'auto';
 
 export interface Preferences {
   language?: LanguageCode;
   themeId?: ThemeId;
+  /** Modo de superfície (Pro). Free fica sempre 'dark'. */
+  themeMode?: ThemeMode;
+  /** Cor de destaque personalizada (Pro), hex. Sobrepõe o preset. */
+  customAccent?: string;
   /** Durações (segundos) de cada categoria de descanso. */
   restDurations?: RestDurations;
 }

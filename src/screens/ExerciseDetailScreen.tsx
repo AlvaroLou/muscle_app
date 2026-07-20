@@ -1,6 +1,7 @@
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -10,6 +11,7 @@ import { Header } from '@/components/Header';
 import { Icon } from '@/components/Icon';
 import { Pill } from '@/components/Pill';
 import { Screen } from '@/components/Screen';
+import { removeExerciseMedia } from '@/premium/mediaService';
 import { useExerciseLibrary } from '@/store/ExerciseLibraryStore';
 import { fonts, ThemeColors } from '@/theme';
 import { useTheme } from '@/theme/ThemeProvider';
@@ -29,11 +31,18 @@ export function ExerciseDetailScreen() {
   const { colors, gradients } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const route = useRoute<RouteProp<RootStackParamList, 'ExerciseDetail'>>();
-  const { getById, isFavorite, toggleFavorite, deleteCustom, duplicateCustom } =
+  const { getById, isFavorite, toggleFavorite, deleteCustom, duplicateCustom, resetStandard } =
     useExerciseLibrary();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
 
   const exercise = getById(route.params.exerciseId);
+
+  // Player do vídeo (Pro). Hook chamado incondicionalmente (source null = sem vídeo).
+  const videoUri = exercise?.custom?.videoUri;
+  const player = useVideoPlayer(videoUri ?? null, (p) => {
+    p.loop = false;
+  });
 
   if (!exercise) {
     return (
@@ -52,6 +61,8 @@ export function ExerciseDetailScreen() {
   const tips = exerciseTips(exercise, t);
   const notes = exerciseNotes(exercise, t);
   const fav = isFavorite(exercise.id);
+  // Exercício padrão com edições do usuário (override) → pode restaurar.
+  const hasOverride = !exercise.isCustom && !!exercise.custom;
 
   return (
     <Screen edges={['top', 'left', 'right', 'bottom']}>
@@ -70,16 +81,25 @@ export function ExerciseDetailScreen() {
       />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-        {/* Media placeholder (future GIF/video) */}
-        <LinearGradient
-          colors={gradients.exercisePlaceholder}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.media}
-        >
-          <Icon name="dumbbell" size={40} color={colors.textFaint} />
-          <Text style={styles.mediaText}>{t('library.mediaComingSoon')}</Text>
-        </LinearGradient>
+        {/* Mídia: vídeo do usuário (Pro) ou placeholder */}
+        {videoUri ? (
+          <VideoView
+            player={player}
+            style={styles.media}
+            nativeControls
+            contentFit="cover"
+          />
+        ) : (
+          <LinearGradient
+            colors={gradients.exercisePlaceholder}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.media}
+          >
+            <Icon name="dumbbell" size={40} color={colors.textFaint} />
+            <Text style={styles.mediaText}>{t('library.mediaComingSoon')}</Text>
+          </LinearGradient>
+        )}
 
         <View style={styles.nameLine}>
           <Text style={styles.name}>{exerciseName(exercise, t)}</Text>
@@ -126,18 +146,20 @@ export function ExerciseDetailScreen() {
           </Text>
         </View>
 
-        {/* Custom actions */}
-        {exercise.isCustom ? (
-          <View style={styles.actions}>
-            <Pressable
-              style={({ pressed }) => [styles.actionBtn, pressed && styles.pressed]}
-              onPress={() =>
-                navigation.navigate('CustomExerciseEditor', { exerciseId: exercise.id })
-              }
-            >
-              <Icon name="edit" size={18} color={colors.accent} />
-              <Text style={styles.actionText}>{t('common.edit')}</Text>
-            </Pressable>
+        {/* Ações: editar (todos), duplicar/excluir (personalizados) ou
+            restaurar padrão (padrão editado) */}
+        <View style={styles.actions}>
+          <Pressable
+            style={({ pressed }) => [styles.actionBtn, pressed && styles.pressed]}
+            onPress={() =>
+              navigation.navigate('CustomExerciseEditor', { exerciseId: exercise.id })
+            }
+          >
+            <Icon name="edit" size={18} color={colors.accent} />
+            <Text style={styles.actionText}>{t('common.edit')}</Text>
+          </Pressable>
+
+          {exercise.isCustom ? (
             <Pressable
               style={({ pressed }) => [styles.actionBtn, pressed && styles.pressed]}
               onPress={() => {
@@ -148,6 +170,9 @@ export function ExerciseDetailScreen() {
               <Icon name="copy" size={18} color={colors.accent} />
               <Text style={styles.actionText}>{t('library.duplicate')}</Text>
             </Pressable>
+          ) : null}
+
+          {exercise.isCustom ? (
             <Pressable
               style={({ pressed }) => [styles.actionBtn, pressed && styles.pressed]}
               onPress={() => setConfirmDelete(true)}
@@ -157,8 +182,18 @@ export function ExerciseDetailScreen() {
                 {t('common.delete')}
               </Text>
             </Pressable>
-          </View>
-        ) : null}
+          ) : hasOverride ? (
+            <Pressable
+              style={({ pressed }) => [styles.actionBtn, pressed && styles.pressed]}
+              onPress={() => setConfirmReset(true)}
+            >
+              <Icon name="history" size={18} color={colors.danger} />
+              <Text style={[styles.actionText, { color: colors.danger }]}>
+                {t('library.restoreDefault')}
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
       </ScrollView>
 
       <ConfirmSheet
@@ -171,8 +206,33 @@ export function ExerciseDetailScreen() {
             label: t('common.delete'),
             variant: 'danger',
             onPress: () => {
+              void removeExerciseMedia({
+                videoUri: exercise.custom?.videoUri,
+                thumbnailUri: exercise.custom?.thumbnailUri,
+              });
               deleteCustom(exercise.id);
               navigation.goBack();
+            },
+          },
+        ]}
+      />
+
+      <ConfirmSheet
+        visible={confirmReset}
+        title={t('library.restoreDefaultTitle')}
+        message={t('library.restoreDefaultMessage')}
+        onClose={() => setConfirmReset(false)}
+        actions={[
+          {
+            label: t('library.restoreDefault'),
+            variant: 'danger',
+            onPress: () => {
+              void removeExerciseMedia({
+                videoUri: exercise.custom?.videoUri,
+                thumbnailUri: exercise.custom?.thumbnailUri,
+              });
+              resetStandard(exercise.id);
+              setConfirmReset(false);
             },
           },
         ]}

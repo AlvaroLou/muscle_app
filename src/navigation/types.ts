@@ -24,6 +24,8 @@ export type RootStackParamList = {
   ActiveWorkout: { workoutId: string; groupId?: string };
   SessionSummary: { sessionId: string };
   Settings: undefined;
+  Premium: undefined;
+  PremiumStats: undefined;
   ExerciseDetail: { exerciseId: string };
   CustomExerciseEditor: { exerciseId?: string } | undefined;
 };

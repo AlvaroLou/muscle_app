@@ -75,12 +75,16 @@ export interface LibraryExercise {
   /** Descanso recomendado (categoria). Copiado ao usar no treino. */
   restType?: RestType;
   isCustom: boolean;
-  /** Só nos personalizados: textos literais (não traduzidos). */
+  /** Só nos personalizados: textos literais (não traduzidos) + mídia (Pro). */
   custom?: {
     name: string;
     notes?: string;
     instructions?: string;
     tips?: string;
+    /** Vídeo demonstrativo do usuário (uri local). */
+    videoUri?: string;
+    /** Miniatura gerada do vídeo (uri local). */
+    thumbnailUri?: string;
   };
 }
 

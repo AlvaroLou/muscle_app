@@ -39,11 +39,20 @@ export function HistoryScreen() {
             {t('history.count', { count: sessions.length })}
           </Text>
         </View>
-        {sessions.length > 0 ? (
-          <Pressable hitSlop={8} onPress={() => setClearOpen(true)}>
-            <Text style={styles.clearText}>{t('common.clear')}</Text>
+        <View style={styles.headerActions}>
+          <Pressable
+            hitSlop={8}
+            onPress={() => navigation.navigate('PremiumStats')}
+            style={styles.statsBtn}
+          >
+            <Icon name="chart" size={20} color={colors.accent} />
           </Pressable>
-        ) : null}
+          {sessions.length > 0 ? (
+            <Pressable hitSlop={8} onPress={() => setClearOpen(true)}>
+              <Text style={styles.clearText}>{t('common.clear')}</Text>
+            </Pressable>
+          ) : null}
+        </View>
       </View>
 
       <BannerAd />
@@ -111,6 +120,19 @@ const makeStyles = (colors: ThemeColors) =>
     fontFamily: fonts.body,
     fontSize: 14,
     marginTop: 4,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  statsBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.accentTint,
   },
   clearText: {
     color: colors.textSecondary,

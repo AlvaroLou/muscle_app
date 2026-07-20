@@ -3,6 +3,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -17,11 +18,19 @@ import { BannerAd } from '@/components/BannerAd';
 import { Icon } from '@/components/Icon';
 import { Screen } from '@/components/Screen';
 import { MUSCLE_GROUP_ORDER } from '@/data/exerciseLibrary';
+import { pickExerciseVideo, removeExerciseMedia } from '@/premium/mediaService';
 import { REST_TYPES } from '@/services/rest';
 import { useExerciseLibrary } from '@/store/ExerciseLibraryStore';
+import { usePremium } from '@/store/PremiumStore';
 import { Equipment, MuscleGroup, RestType } from '@/types';
 import { fonts, ThemeColors } from '@/theme';
 import { useTheme } from '@/theme/ThemeProvider';
+import {
+  exerciseInstructions,
+  exerciseName,
+  exerciseNotes,
+  exerciseTips,
+} from '@/utils/exerciseText';
 import { RootStackParamList } from '@/navigation/types';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'CustomExerciseEditor'>;
@@ -43,21 +52,51 @@ export function CustomExerciseEditorScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const route = useRoute<RouteProp<RootStackParamList, 'CustomExerciseEditor'>>();
-  const { getById, addCustom, updateCustom } = useExerciseLibrary();
+  const { getById, addCustom, updateCustom, updateStandard } = useExerciseLibrary();
+  const { isPro } = usePremium();
 
   const editingId = route.params?.exerciseId;
   const existing = editingId ? getById(editingId) : undefined;
+  // Padrão editado = mostra o texto atual (traduzido ou já sobrescrito).
+  const isStandard = !!existing && !existing.isCustom;
 
-  const [name, setName] = useState(existing?.custom?.name ?? '');
+  const [name, setName] = useState(existing ? exerciseName(existing, t) : '');
   const [muscleGroup, setMuscleGroup] = useState<MuscleGroup>(existing?.muscleGroup ?? 'chest');
   const [secondary, setSecondary] = useState<Set<MuscleGroup>>(
     new Set(existing?.secondaryMuscles ?? []),
   );
   const [equipment, setEquipment] = useState<Equipment>(existing?.equipment ?? 'bodyweight');
   const [restType, setRestType] = useState<RestType | undefined>(existing?.restType);
-  const [instructions, setInstructions] = useState(existing?.custom?.instructions ?? '');
-  const [tips, setTips] = useState(existing?.custom?.tips ?? '');
-  const [notes, setNotes] = useState(existing?.custom?.notes ?? '');
+  const [instructions, setInstructions] = useState(
+    existing ? exerciseInstructions(existing, t) : '',
+  );
+  const [tips, setTips] = useState(existing ? exerciseTips(existing, t) : '');
+  const [notes, setNotes] = useState(existing ? exerciseNotes(existing, t) : '');
+  const [videoUri, setVideoUri] = useState<string | undefined>(existing?.custom?.videoUri);
+  const [thumbnailUri, setThumbnailUri] = useState<string | undefined>(
+    existing?.custom?.thumbnailUri,
+  );
+  const [mediaBusy, setMediaBusy] = useState(false);
+
+  const pickVideo = async () => {
+    setMediaBusy(true);
+    try {
+      const picked = await pickExerciseVideo();
+      if (picked) {
+        if (videoUri) void removeExerciseMedia({ videoUri, thumbnailUri });
+        setVideoUri(picked.videoUri);
+        setThumbnailUri(picked.thumbnailUri);
+      }
+    } finally {
+      setMediaBusy(false);
+    }
+  };
+
+  const removeVideo = () => {
+    if (videoUri) void removeExerciseMedia({ videoUri, thumbnailUri });
+    setVideoUri(undefined);
+    setThumbnailUri(undefined);
+  };
 
   const toggleSecondary = (m: MuscleGroup) =>
     setSecondary((prev) => {
@@ -80,9 +119,15 @@ export function CustomExerciseEditorScreen() {
       instructions,
       tips,
       notes,
+      videoUri,
+      thumbnailUri,
     };
     if (editingId && existing) {
-      updateCustom(editingId, input);
+      if (existing.isCustom) {
+        updateCustom(editingId, input);
+      } else {
+        updateStandard(editingId, input);
+      }
     } else {
       addCustom(input);
     }
@@ -96,7 +141,11 @@ export function CustomExerciseEditorScreen() {
           <Text style={styles.cancel}>{t('common.cancel')}</Text>
         </Pressable>
         <Text style={styles.title}>
-          {editingId ? t('library.editCustomTitle') : t('library.newCustomTitle')}
+          {!editingId
+            ? t('library.newCustomTitle')
+            : isStandard
+              ? t('library.editStandardTitle')
+              : t('library.editCustomTitle')}
         </Text>
         <Pressable hitSlop={8} onPress={save} disabled={!canSave}>
           <Text style={[styles.save, !canSave && styles.saveDisabled]}>{t('common.save')}</Text>
@@ -186,6 +235,59 @@ export function CustomExerciseEditorScreen() {
               </Pressable>
             ))}
           </View>
+
+          <Text style={styles.label}>{t('library.mediaLabel')}</Text>
+          {isPro ? (
+            videoUri ? (
+              <View style={styles.mediaCard}>
+                {thumbnailUri ? (
+                  <Image source={{ uri: thumbnailUri }} style={styles.thumb} />
+                ) : (
+                  <View style={[styles.thumb, styles.thumbFallback]}>
+                    <Icon name="dumbbell" size={22} color={colors.textMuted} />
+                  </View>
+                )}
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.mediaTitle}>{t('library.videoAttached')}</Text>
+                  <View style={styles.mediaActions}>
+                    <Pressable onPress={pickVideo} disabled={mediaBusy} hitSlop={6}>
+                      <Text style={styles.mediaAction}>{t('library.replaceVideo')}</Text>
+                    </Pressable>
+                    <Pressable onPress={removeVideo} hitSlop={6}>
+                      <Text style={[styles.mediaAction, { color: colors.danger }]}>
+                        {t('library.removeVideo')}
+                      </Text>
+                    </Pressable>
+                  </View>
+                </View>
+              </View>
+            ) : (
+              <Pressable
+                onPress={pickVideo}
+                disabled={mediaBusy}
+                style={({ pressed }) => [styles.mediaAdd, pressed && styles.pressed]}
+              >
+                <Icon name="plus" size={18} color={colors.accent} />
+                <Text style={styles.mediaAddText}>
+                  {mediaBusy ? t('library.processingVideo') : t('library.addVideo')}
+                </Text>
+              </Pressable>
+            )
+          ) : (
+            <Pressable
+              onPress={() => navigation.navigate('Premium')}
+              style={({ pressed }) => [styles.mediaLock, pressed && styles.pressed]}
+            >
+              <Icon name="star" size={16} color={colors.accent} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.mediaLockTitle}>{t('library.videoPro')}</Text>
+                <Text style={styles.mediaLockDesc}>{t('library.videoProDesc')}</Text>
+              </View>
+              <View style={styles.proBadge}>
+                <Text style={styles.proBadgeText}>PRO</Text>
+              </View>
+            </Pressable>
+          )}
 
           <Text style={styles.label}>{t('library.instructions')}</Text>
           <TextInput
@@ -314,5 +416,93 @@ const makeStyles = (colors: ThemeColors) =>
     chipTextActive: {
       color: colors.onAccent,
       fontFamily: fonts.bodyBold,
+    },
+    pressed: {
+      opacity: 0.7,
+    },
+    mediaCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      backgroundColor: colors.card,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: 10,
+    },
+    thumb: {
+      width: 72,
+      height: 72,
+      borderRadius: 10,
+      backgroundColor: colors.inputAlt,
+    },
+    thumbFallback: {
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    mediaTitle: {
+      color: colors.text,
+      fontFamily: fonts.bodyBold,
+      fontSize: 14,
+    },
+    mediaActions: {
+      flexDirection: 'row',
+      gap: 16,
+      marginTop: 8,
+    },
+    mediaAction: {
+      color: colors.accent,
+      fontFamily: fonts.bodyBold,
+      fontSize: 13,
+    },
+    mediaAdd: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      paddingVertical: 16,
+      borderRadius: 12,
+      borderWidth: 2,
+      borderStyle: 'dashed',
+      borderColor: colors.accentBorderStrong,
+      backgroundColor: colors.accentTintSofter,
+    },
+    mediaAddText: {
+      color: colors.accent,
+      fontFamily: fonts.bodyBold,
+      fontSize: 14,
+    },
+    mediaLock: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      backgroundColor: colors.card,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: 14,
+    },
+    mediaLockTitle: {
+      color: colors.text,
+      fontFamily: fonts.bodyBold,
+      fontSize: 14,
+    },
+    mediaLockDesc: {
+      color: colors.textSecondary,
+      fontFamily: fonts.body,
+      fontSize: 12,
+      marginTop: 2,
+    },
+    proBadge: {
+      backgroundColor: colors.accentTint,
+      borderRadius: 6,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+    },
+    proBadgeText: {
+      color: colors.accent,
+      fontFamily: fonts.mono,
+      fontSize: 10,
+      letterSpacing: 0.5,
     },
   });

@@ -1,15 +1,15 @@
+import type { Entitlement } from '@/premium/BillingService';
 import { storage } from '@/services/storage';
 
 /**
- * Persistência do estado Premium. Por enquanto guarda só um override de
- * desenvolvimento (para testar Free vs Pro sem billing). Quando o Google Play
- * Billing entrar, o direito real de compra também será resolvido aqui.
+ * Persistência do direito Premium (entitlement). Guarda o último estado
+ * conhecido para o app abrir já sabendo se é Pro, sem esperar a loja. Quando o
+ * billing real entrar, ele revalida e sobrescreve isto.
  */
 const STORAGE_KEY = '@workout_planner/premium';
 
 export interface PremiumState {
-  /** Override manual de dev: força Pro (true) / Free (false). undefined = padrão. */
-  devPro?: boolean;
+  entitlement?: Entitlement;
 }
 
 export const premiumRepository = {

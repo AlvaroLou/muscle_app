@@ -13,6 +13,7 @@ import {
   Preferences,
   preferencesRepository,
   ThemeId,
+  ThemeMode,
 } from '@/repositories/preferencesRepository';
 import { DEFAULT_REST_DURATIONS, RestDurations } from '@/services/rest';
 import { RestType } from '@/types';
@@ -25,9 +26,16 @@ import { RestType } from '@/types';
 interface PreferencesValue {
   language: LanguageCode;
   themeId: ThemeId;
+  themeMode: ThemeMode;
+  /** Cor de destaque custom (Pro) ou undefined = usar o preset. */
+  customAccent?: string;
   restDurations: RestDurations;
   setLanguage: (lng: LanguageCode) => void;
+  /** Seleciona um preset de accent (limpa a cor custom). */
   setThemeId: (id: ThemeId) => void;
+  setThemeMode: (mode: ThemeMode) => void;
+  /** Define a cor de destaque custom (null limpa e volta ao preset). */
+  setCustomAccent: (hex: string | null) => void;
   setRestDuration: (type: RestType, seconds: number) => void;
 }
 
@@ -38,6 +46,8 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     (i18n.language as LanguageCode) ?? 'en',
   );
   const [themeId, setThemeIdState] = useState<ThemeId>('dark');
+  const [themeMode, setThemeModeState] = useState<ThemeMode>('dark');
+  const [customAccent, setCustomAccentState] = useState<string | undefined>(undefined);
   const [restDurations, setRestDurationsState] =
     useState<RestDurations>(DEFAULT_REST_DURATIONS);
 
@@ -52,6 +62,8 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
         void i18n.changeLanguage(stored.language);
       }
       if (stored.themeId) setThemeIdState(stored.themeId);
+      if (stored.themeMode) setThemeModeState(stored.themeMode);
+      if (stored.customAccent) setCustomAccentState(stored.customAccent);
       if (stored.restDurations) {
         setRestDurationsState({ ...DEFAULT_REST_DURATIONS, ...stored.restDurations });
       }
@@ -78,8 +90,27 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
 
   const setThemeId = useCallback(
     (id: ThemeId) => {
+      // Escolher um preset limpa a cor custom (o preset volta a valer).
       setThemeIdState(id);
-      persist({ themeId: id });
+      setCustomAccentState(undefined);
+      persist({ themeId: id, customAccent: undefined });
+    },
+    [persist],
+  );
+
+  const setThemeMode = useCallback(
+    (mode: ThemeMode) => {
+      setThemeModeState(mode);
+      persist({ themeMode: mode });
+    },
+    [persist],
+  );
+
+  const setCustomAccent = useCallback(
+    (hex: string | null) => {
+      const value = hex ?? undefined;
+      setCustomAccentState(value);
+      persist({ customAccent: value });
     },
     [persist],
   );
@@ -96,8 +127,30 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
   );
 
   const value = useMemo<PreferencesValue>(
-    () => ({ language, themeId, restDurations, setLanguage, setThemeId, setRestDuration }),
-    [language, themeId, restDurations, setLanguage, setThemeId, setRestDuration],
+    () => ({
+      language,
+      themeId,
+      themeMode,
+      customAccent,
+      restDurations,
+      setLanguage,
+      setThemeId,
+      setThemeMode,
+      setCustomAccent,
+      setRestDuration,
+    }),
+    [
+      language,
+      themeId,
+      themeMode,
+      customAccent,
+      restDurations,
+      setLanguage,
+      setThemeId,
+      setThemeMode,
+      setCustomAccent,
+      setRestDuration,
+    ],
   );
 
   return (
