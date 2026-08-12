@@ -5,16 +5,19 @@ import { RewardedManager } from './RewardedManager';
 
 /**
  * Serviço central de anúncios (AdService). Concentra TODA a lógica de
- * monetização: inicialização do SDK, cache via managers, controle de
- * frequência, gate Free/Pro e tratamento de erros. As telas nunca falam com o
- * SDK diretamente — usam este serviço (via `useAds`) e o `BannerAd`.
+ * monetização: inicialização do SDK, cache via managers, controle de frequência
+ * e tratamento de erros. As telas nunca falam com o SDK diretamente — usam este
+ * serviço (via `useAds`) e o `BannerAd`.
+ *
+ * O app é gratuito e os anúncios aparecem para TODOS (não há versão paga). A
+ * única supressão temporária é a recompensa do Rewarded Ad (assistir libera uma
+ * janela sem intersticiais) — uma vantagem opcional, não um plano pago.
  */
 class AdServiceImpl {
   readonly interstitial = new InterstitialManager();
   readonly rewarded = new RewardedManager();
 
   private started = false;
-  private isPro = false;
   private lastInterstitialAt = 0;
   private exercisesSinceAd = 0;
   /** Enquanto Date.now() < isto, os intersticiais ficam suprimidos (recompensa). */
@@ -24,15 +27,9 @@ class AdServiceImpl {
     return Date.now() < this.adFreeUntil;
   }
 
-  /** Define a versão. Em Pro, encerra tudo e nunca mais inicializa/exibe. */
-  setPro(isPro: boolean): void {
-    this.isPro = isPro;
-    if (isPro) this.teardown();
-  }
-
   /** Inicializa o SDK e começa o pré-carregamento. Idempotente. */
   async start(): Promise<boolean> {
-    if (this.isPro || this.started) return this.started && !this.isPro;
+    if (this.started) return true;
     const admob = getAdmob();
     if (!admob) return false;
     try {
@@ -47,14 +44,8 @@ class AdServiceImpl {
     }
   }
 
-  private teardown(): void {
-    this.started = false;
-    this.interstitial.destroy();
-    this.rewarded.destroy();
-  }
-
   get isReady(): boolean {
-    return this.started && !this.isPro;
+    return this.started;
   }
 
   // ---- Intersticial (entre exercícios, com frequência) ----

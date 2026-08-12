@@ -23,7 +23,6 @@ import { Pill } from '@/components/Pill';
 import { Screen } from '@/components/Screen';
 import { exportWorkout, ExportFormat } from '@/premium/ExportService';
 import { usePreferences } from '@/store/PreferencesStore';
-import { usePremium } from '@/store/PremiumStore';
 import { useWorkouts } from '@/store/WorkoutStore';
 import { Exercise, ExerciseGroup } from '@/types';
 import { fonts, ThemeColors } from '@/theme';
@@ -43,7 +42,6 @@ export function DetailsScreen() {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const route = useRoute<RouteProp<WorkoutsStackParamList, 'Details'>>();
   const { workouts, reorderGroups, reorderExercises } = useWorkouts();
-  const { isPro } = usePremium();
   const { restDurations } = usePreferences();
   const [exportOpen, setExportOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -80,14 +78,8 @@ export function DetailsScreen() {
       return next;
     });
 
-  // Exportação (Pro): Free vai para a tela Premium; Pro escolhe PDF/TXT.
-  const openExport = () => {
-    if (!isPro) {
-      navigation.navigate('Premium');
-      return;
-    }
-    setExportOpen(true);
-  };
+  // Exportação (PDF/TXT) — disponível para todos.
+  const openExport = () => setExportOpen(true);
   const runExport = async (format: ExportFormat) => {
     setExportOpen(false);
     setExporting(true);

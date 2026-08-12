@@ -12,8 +12,7 @@ import { ExerciseDetailScreen } from '@/screens/ExerciseDetailScreen';
 import { ExerciseLibraryScreen } from '@/screens/ExerciseLibraryScreen';
 import { HomeScreen } from '@/screens/HomeScreen';
 import { HistoryScreen } from '@/screens/HistoryScreen';
-import { PremiumScreen } from '@/screens/PremiumScreen';
-import { PremiumStatsScreen } from '@/screens/PremiumStatsScreen';
+import { StatisticsScreen } from '@/screens/StatisticsScreen';
 import { SessionSummaryScreen } from '@/screens/SessionSummaryScreen';
 import { SettingsScreen } from '@/screens/SettingsScreen';
 import { WorkoutsScreen } from '@/screens/WorkoutsScreen';
@@ -110,13 +109,8 @@ export function RootNavigator() {
         options={{ presentation: 'modal' }}
       />
       <RootStack.Screen
-        name="Premium"
-        component={PremiumScreen}
-        options={{ presentation: 'modal' }}
-      />
-      <RootStack.Screen
-        name="PremiumStats"
-        component={PremiumStatsScreen}
+        name="Statistics"
+        component={StatisticsScreen}
         options={{ presentation: 'modal' }}
       />
       <RootStack.Screen

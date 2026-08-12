@@ -4,51 +4,26 @@ import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { GradientButton } from '@/components/GradientButton';
 import { Header } from '@/components/Header';
 import { Icon } from '@/components/Icon';
 import { Screen } from '@/components/Screen';
-import { usePremium } from '@/store/PremiumStore';
 import { useWorkouts } from '@/store/WorkoutStore';
 import { fonts, ThemeColors } from '@/theme';
 import { useTheme } from '@/theme/ThemeProvider';
 import { formatDuration } from '@/utils/time';
-import { buildAdvancedStats } from '@/utils/premiumStats';
+import { buildAdvancedStats } from '@/utils/advancedStats';
 import { RootStackParamList } from '@/navigation/types';
 
-type Nav = NativeStackNavigationProp<RootStackParamList, 'PremiumStats'>;
+type Nav = NativeStackNavigationProp<RootStackParamList, 'Statistics'>;
 
-export function PremiumStatsScreen() {
+export function StatisticsScreen() {
   const navigation = useNavigation<Nav>();
   const { t } = useTranslation();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const { isPro } = usePremium();
   const { sessions } = useWorkouts();
 
   const stats = useMemo(() => buildAdvancedStats(sessions), [sessions]);
-
-  // ----- Estado bloqueado (Free) -----
-  if (!isPro) {
-    return (
-      <Screen edges={['top', 'left', 'right', 'bottom']}>
-        <Header title={t('stats.title')} onBack={() => navigation.goBack()} />
-        <View style={styles.locked}>
-          <View style={styles.lockIcon}>
-            <Icon name="star-filled" size={32} color={colors.accent} />
-          </View>
-          <Text style={styles.lockedTitle}>{t('stats.lockedTitle')}</Text>
-          <Text style={styles.lockedDesc}>{t('stats.lockedDesc')}</Text>
-          <View style={{ alignSelf: 'stretch', marginTop: 20 }}>
-            <GradientButton
-              label={t('premium.upgrade')}
-              onPress={() => navigation.navigate('Premium')}
-            />
-          </View>
-        </View>
-      </Screen>
-    );
-  }
 
   // ----- Sem histórico -----
   if (sessions.length === 0) {
@@ -164,21 +139,6 @@ const makeStyles = (colors: ThemeColors) =>
       justifyContent: 'center',
       paddingHorizontal: 28,
       gap: 10,
-    },
-    lockIcon: {
-      width: 72,
-      height: 72,
-      borderRadius: 22,
-      backgroundColor: colors.accentTint,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: 6,
-    },
-    lockedTitle: {
-      color: colors.text,
-      fontFamily: fonts.heading,
-      fontSize: 22,
-      textAlign: 'center',
     },
     lockedDesc: {
       color: colors.textSecondary,

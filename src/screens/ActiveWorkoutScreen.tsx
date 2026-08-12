@@ -318,7 +318,7 @@ function RunningSession({
               <Text style={styles.summaryLabel}>{t('summary.setsDone')}</Text>
             </View>
           </View>
-          {!ads.isPro && ads.ready ? (
+          {ads.rewardedReady ? (
             rewardMsg ? (
               <Text style={styles.rewardMsg}>{rewardMsg}</Text>
             ) : (

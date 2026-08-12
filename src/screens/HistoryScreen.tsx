@@ -42,7 +42,7 @@ export function HistoryScreen() {
         <View style={styles.headerActions}>
           <Pressable
             hitSlop={8}
-            onPress={() => navigation.navigate('PremiumStats')}
+            onPress={() => navigation.navigate('Statistics')}
             style={styles.statsBtn}
           >
             <Icon name="chart" size={20} color={colors.accent} />

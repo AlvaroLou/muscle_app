@@ -21,7 +21,6 @@ import { MUSCLE_GROUP_ORDER } from '@/data/exerciseLibrary';
 import { pickExerciseVideo, removeExerciseMedia } from '@/premium/mediaService';
 import { REST_TYPES } from '@/services/rest';
 import { useExerciseLibrary } from '@/store/ExerciseLibraryStore';
-import { usePremium } from '@/store/PremiumStore';
 import { Equipment, MuscleGroup, RestType } from '@/types';
 import { fonts, ThemeColors } from '@/theme';
 import { useTheme } from '@/theme/ThemeProvider';
@@ -53,7 +52,6 @@ export function CustomExerciseEditorScreen() {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const route = useRoute<RouteProp<RootStackParamList, 'CustomExerciseEditor'>>();
   const { getById, addCustom, updateCustom, updateStandard } = useExerciseLibrary();
-  const { isPro } = usePremium();
 
   const editingId = route.params?.exerciseId;
   const existing = editingId ? getById(editingId) : undefined;
@@ -237,55 +235,39 @@ export function CustomExerciseEditorScreen() {
           </View>
 
           <Text style={styles.label}>{t('library.mediaLabel')}</Text>
-          {isPro ? (
-            videoUri ? (
-              <View style={styles.mediaCard}>
-                {thumbnailUri ? (
-                  <Image source={{ uri: thumbnailUri }} style={styles.thumb} />
-                ) : (
-                  <View style={[styles.thumb, styles.thumbFallback]}>
-                    <Icon name="dumbbell" size={22} color={colors.textMuted} />
-                  </View>
-                )}
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.mediaTitle}>{t('library.videoAttached')}</Text>
-                  <View style={styles.mediaActions}>
-                    <Pressable onPress={pickVideo} disabled={mediaBusy} hitSlop={6}>
-                      <Text style={styles.mediaAction}>{t('library.replaceVideo')}</Text>
-                    </Pressable>
-                    <Pressable onPress={removeVideo} hitSlop={6}>
-                      <Text style={[styles.mediaAction, { color: colors.danger }]}>
-                        {t('library.removeVideo')}
-                      </Text>
-                    </Pressable>
-                  </View>
+          {videoUri ? (
+            <View style={styles.mediaCard}>
+              {thumbnailUri ? (
+                <Image source={{ uri: thumbnailUri }} style={styles.thumb} />
+              ) : (
+                <View style={[styles.thumb, styles.thumbFallback]}>
+                  <Icon name="dumbbell" size={22} color={colors.textMuted} />
+                </View>
+              )}
+              <View style={{ flex: 1 }}>
+                <Text style={styles.mediaTitle}>{t('library.videoAttached')}</Text>
+                <View style={styles.mediaActions}>
+                  <Pressable onPress={pickVideo} disabled={mediaBusy} hitSlop={6}>
+                    <Text style={styles.mediaAction}>{t('library.replaceVideo')}</Text>
+                  </Pressable>
+                  <Pressable onPress={removeVideo} hitSlop={6}>
+                    <Text style={[styles.mediaAction, { color: colors.danger }]}>
+                      {t('library.removeVideo')}
+                    </Text>
+                  </Pressable>
                 </View>
               </View>
-            ) : (
-              <Pressable
-                onPress={pickVideo}
-                disabled={mediaBusy}
-                style={({ pressed }) => [styles.mediaAdd, pressed && styles.pressed]}
-              >
-                <Icon name="plus" size={18} color={colors.accent} />
-                <Text style={styles.mediaAddText}>
-                  {mediaBusy ? t('library.processingVideo') : t('library.addVideo')}
-                </Text>
-              </Pressable>
-            )
+            </View>
           ) : (
             <Pressable
-              onPress={() => navigation.navigate('Premium')}
-              style={({ pressed }) => [styles.mediaLock, pressed && styles.pressed]}
+              onPress={pickVideo}
+              disabled={mediaBusy}
+              style={({ pressed }) => [styles.mediaAdd, pressed && styles.pressed]}
             >
-              <Icon name="star" size={16} color={colors.accent} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.mediaLockTitle}>{t('library.videoPro')}</Text>
-                <Text style={styles.mediaLockDesc}>{t('library.videoProDesc')}</Text>
-              </View>
-              <View style={styles.proBadge}>
-                <Text style={styles.proBadgeText}>PRO</Text>
-              </View>
+              <Icon name="plus" size={18} color={colors.accent} />
+              <Text style={styles.mediaAddText}>
+                {mediaBusy ? t('library.processingVideo') : t('library.addVideo')}
+              </Text>
             </Pressable>
           )}
 
@@ -471,38 +453,5 @@ const makeStyles = (colors: ThemeColors) =>
       color: colors.accent,
       fontFamily: fonts.bodyBold,
       fontSize: 14,
-    },
-    mediaLock: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 12,
-      backgroundColor: colors.card,
-      borderRadius: 14,
-      borderWidth: 1,
-      borderColor: colors.border,
-      padding: 14,
-    },
-    mediaLockTitle: {
-      color: colors.text,
-      fontFamily: fonts.bodyBold,
-      fontSize: 14,
-    },
-    mediaLockDesc: {
-      color: colors.textSecondary,
-      fontFamily: fonts.body,
-      fontSize: 12,
-      marginTop: 2,
-    },
-    proBadge: {
-      backgroundColor: colors.accentTint,
-      borderRadius: 6,
-      paddingHorizontal: 8,
-      paddingVertical: 3,
-    },
-    proBadgeText: {
-      color: colors.accent,
-      fontFamily: fonts.mono,
-      fontSize: 10,
-      letterSpacing: 0.5,
     },
   });
