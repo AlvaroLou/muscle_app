@@ -52,7 +52,14 @@ export function BottomSheet({ visible, onClose, children }: Props) {
   });
 
   return (
-    <Modal transparent visible={rendered} onRequestClose={onClose} animationType="none">
+    <Modal
+      transparent
+      visible={rendered}
+      onRequestClose={onClose}
+      animationType="none"
+      statusBarTranslucent
+      navigationBarTranslucent
+    >
       <Animated.View style={[styles.backdrop, { opacity: anim }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       </Animated.View>

@@ -8,13 +8,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import {
-  NestableDraggableFlatList,
-  NestableScrollContainer,
-  RenderItemParams,
-  ScaleDecorator,
-} from 'react-native-draggable-flatlist';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { BottomSheet } from '@/components/BottomSheet';
 import { GradientButton } from '@/components/GradientButton';
@@ -41,10 +35,12 @@ export function DetailsScreen() {
   const { colors, gradients } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const route = useRoute<RouteProp<WorkoutsStackParamList, 'Details'>>();
-  const { workouts, reorderGroups, reorderExercises } = useWorkouts();
+  const { workouts } = useWorkouts();
   const { restDurations } = usePreferences();
   const [exportOpen, setExportOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
+  // Grupos minimizados (por id). Vale também para o treino simples (grupo único).
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   // Sem id (ex.: vindo da Home) cai no primeiro treino.
   const workoutId = route.params?.workoutId ?? workouts[0]?.id;
@@ -69,8 +65,6 @@ export function DetailsScreen() {
   const grouped =
     workout.groups.length > 1 || workout.groups.some((g) => g.name.trim().length > 0);
 
-  // Grupos minimizados (por id). Vale também para o treino simples (grupo único).
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const toggleCollapse = (id: string) =>
     setCollapsed((prev) => {
       const next = new Set(prev);
@@ -92,62 +86,50 @@ export function DetailsScreen() {
     }
   };
 
-  const renderGroup = ({
-    item: group,
-    drag: dragGroup,
-    isActive: groupActive,
-  }: RenderItemParams<ExerciseGroup>) => {
+  const renderGroup = (group: ExerciseGroup) => {
     const isCollapsed = collapsed.has(group.id);
 
-    const renderExercise = ({ item: ex, drag, isActive, getIndex }: RenderItemParams<Exercise>) => (
-      <ScaleDecorator>
-        <View style={[styles.exerciseCard, isActive && styles.cardActive]}>
-          <Pressable hitSlop={8} onPressIn={drag} onLongPress={drag} style={styles.dragHandle}>
-            <Icon name="grip" size={16} color={colors.textMuted} />
-          </Pressable>
-          <LinearGradient
-            colors={gradients.exercisePlaceholder}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.exerciseImage}
-          >
-            <Text style={styles.exerciseNum}>{(getIndex() ?? 0) + 1}</Text>
-          </LinearGradient>
-          <View style={styles.exerciseInfo}>
-            <Text style={styles.exerciseName} numberOfLines={1}>
-              {ex.name}
-            </Text>
-            <View style={styles.exerciseTags}>
-              <Pill
-                label={t('details.setsReps', { sets: ex.sets, reps: ex.reps })}
-                color={colors.accent}
-                background={colors.accentTint}
-                borderColor={colors.accentBorder}
-                style={styles.smallPill}
-                textStyle={styles.smallPillText}
-              />
-              <Pill
-                label={ex.weight > 0 ? t('details.weightKg', { weight: ex.weight }) : t('details.bodyweight')}
-                color={colors.textDim2}
-                background={colors.white06}
-                style={styles.smallPill}
-                textStyle={styles.smallPillText}
-              />
-            </View>
-            {ex.description?.trim() ? (
-              <Text style={styles.exerciseDesc}>{ex.description.trim()}</Text>
-            ) : null}
+    const renderExercise = (ex: Exercise, exIndex: number) => (
+      <View key={ex.id} style={styles.exerciseCard}>
+        <LinearGradient
+          colors={gradients.exercisePlaceholder}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.exerciseImage}
+        >
+          <Text style={styles.exerciseNum}>{exIndex + 1}</Text>
+        </LinearGradient>
+        <View style={styles.exerciseInfo}>
+          <Text style={styles.exerciseName} numberOfLines={1}>
+            {ex.name}
+          </Text>
+          <View style={styles.exerciseTags}>
+            <Pill
+              label={t('details.setsReps', { sets: ex.sets, reps: ex.reps })}
+              color={colors.accent}
+              background={colors.accentTint}
+              borderColor={colors.accentBorder}
+              style={styles.smallPill}
+              textStyle={styles.smallPillText}
+            />
+            <Pill
+              label={ex.weight > 0 ? t('details.weightKg', { weight: ex.weight }) : t('details.bodyweight')}
+              color={colors.textDim2}
+              background={colors.white06}
+              style={styles.smallPill}
+              textStyle={styles.smallPillText}
+            />
           </View>
+          {ex.description?.trim() ? (
+            <Text style={styles.exerciseDesc}>{ex.description.trim()}</Text>
+          ) : null}
         </View>
-      </ScaleDecorator>
+      </View>
     );
 
     return (
-      <View style={[styles.group, groupActive && styles.groupActive]}>
+      <View key={group.id} style={styles.group}>
         <View style={styles.groupHeader}>
-          <Pressable hitSlop={8} onPressIn={dragGroup} onLongPress={dragGroup} style={styles.dragHandle}>
-            <Icon name="grip" size={18} color={colors.textMuted} />
-          </Pressable>
           <Pressable style={styles.groupHeaderMain} onPress={() => toggleCollapse(group.id)}>
             <Icon
               name={isCollapsed ? 'chevron-right' : 'chevron-down'}
@@ -177,14 +159,7 @@ export function DetailsScreen() {
             </Pressable>
           ) : null}
         </View>
-        {isCollapsed ? null : (
-          <NestableDraggableFlatList
-            data={group.exercises}
-            keyExtractor={(ex) => ex.id}
-            onDragEnd={({ data }) => reorderExercises(workout.id, group.id, data)}
-            renderItem={renderExercise}
-          />
-        )}
+        {isCollapsed ? null : <View>{group.exercises.map(renderExercise)}</View>}
       </View>
     );
   };
@@ -213,7 +188,7 @@ export function DetailsScreen() {
         </View>
       </View>
 
-      <NestableScrollContainer
+      <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
       >
@@ -234,14 +209,9 @@ export function DetailsScreen() {
         {allExercises(workout).length === 0 ? (
           <Text style={styles.emptyText}>{t('details.empty')}</Text>
         ) : (
-          <NestableDraggableFlatList
-            data={workout.groups}
-            keyExtractor={(g) => g.id}
-            onDragEnd={({ data }) => reorderGroups(workout.id, data)}
-            renderItem={renderGroup}
-          />
+          <View>{workout.groups.map(renderGroup)}</View>
         )}
-      </NestableScrollContainer>
+      </ScrollView>
 
       {/* Fixed bottom button */}
       <View style={styles.footer}>
@@ -381,9 +351,6 @@ const makeStyles = (colors: ThemeColors) =>
     marginTop: 4,
     marginBottom: 12,
   },
-  groupActive: {
-    opacity: 0.9,
-  },
   groupHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -395,13 +362,6 @@ const makeStyles = (colors: ThemeColors) =>
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-  },
-  dragHandle: {
-    paddingHorizontal: 2,
-  },
-  cardActive: {
-    borderColor: colors.accentBorder,
-    opacity: 0.95,
   },
   groupLabel: {
     flex: 1,

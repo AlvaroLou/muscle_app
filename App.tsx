@@ -18,6 +18,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import '@/i18n';
 import { AdsProvider } from '@/ads/AdsProvider';
+import { useImmersiveNavigationBar } from '@/hooks/useImmersiveNavigationBar';
 import { RootNavigator } from '@/navigation';
 import { ExerciseLibraryProvider } from '@/store/ExerciseLibraryStore';
 import { PreferencesProvider } from '@/store/PreferencesStore';
@@ -50,6 +51,7 @@ function ThemedNavigation() {
 }
 
 export default function App() {
+  useImmersiveNavigationBar();
   const [fontsLoaded, fontError] = useFonts({
     BarlowCondensed_600SemiBold,
     BarlowCondensed_700Bold,

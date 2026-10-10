@@ -99,6 +99,7 @@ function RunningSession({
   // para reabrir o contador mesmo com tempos iguais.
   const [rest, setRest] = useState<{ seconds: number; nonce: number } | null>(null);
   const [quitOpen, setQuitOpen] = useState(false);
+  const [finishConfirmOpen, setFinishConfirmOpen] = useState(false);
   const [rewardMsg, setRewardMsg] = useState<string | null>(null);
   const logged = useRef(false);
   // true quando o treino foi finalizado ou descartado: não regravar em 2º plano.
@@ -106,9 +107,6 @@ function RunningSession({
   // true quando o descanso aberto foi da última série do exercício: ao encerrar
   // o descanso (pular ou tempo acabar), avança automaticamente para o próximo.
   const advanceRef = useRef(false);
-  // true quando o descanso aberto foi da última série do último exercício: ao
-  // encerrar o descanso, finaliza o treino automaticamente.
-  const finishRef = useRef(false);
 
   const {
     elapsedMs,
@@ -246,16 +244,41 @@ function RunningSession({
     });
   };
 
+  const pendingSets = totalSets - completedSets;
+
+  // Finaliza direto se tudo foi cumprido; senão pede confirmação.
+  const requestFinish = () => {
+    if (pendingSets > 0) setFinishConfirmOpen(true);
+    else finish();
+  };
+
+  // "Continuar treino" na confirmação: leva ao primeiro exercício pendente.
+  const continueWorkout = () => {
+    const pending = exerciseStatus.find((ex) => !ex.completed);
+    if (pending) goToExercise(pending.index);
+  };
+
   const handleToggleSet = (set: { setIndex: number; completed: boolean }) => {
     toggleSet(currentExercise.id, set.setIndex);
-    // Se a série estava incompleta, agora está sendo concluída → abre o descanso.
+    // Se a série estava incompleta, agora está sendo concluída.
     // (Usamos o estado atual do render; o retorno do setState não é síncrono.)
     if (!set.completed) {
+      // Era a última série pendente do treino → finaliza sem perguntar.
+      if (pendingSets === 1) {
+        advanceRef.current = false;
+        setRest(null);
+        finish();
+        return;
+      }
       const isLastSet = set.setIndex === currentExerciseSets.length - 1;
-      // Última série do exercício: avança para o próximo ao fim do descanso; se
-      // for também o último exercício, finaliza o treino automaticamente.
+      // Última série do último exercício com séries ainda pendentes → confirma.
+      if (isLastSet && isLastExercise) {
+        advanceRef.current = false;
+        setFinishConfirmOpen(true);
+        return;
+      }
+      // Última série do exercício: avança para o próximo ao fim do descanso.
       advanceRef.current = isLastSet && !isLastExercise;
-      finishRef.current = isLastSet && isLastExercise;
       setRest((prev) => ({
         seconds: restSeconds(currentExercise, restDurations),
         nonce: (prev?.nonce ?? 0) + 1,
@@ -264,15 +287,9 @@ function RunningSession({
   };
 
   // Encerra o descanso (pular ou tempo acabar). Avança para o próximo exercício
-  // ou finaliza o treino automaticamente, conforme a série concluída.
+  // quando a série concluída era a última do exercício.
   const handleRestDismiss = () => {
     setRest(null);
-    if (finishRef.current) {
-      finishRef.current = false;
-      advanceRef.current = false;
-      finish();
-      return;
-    }
     if (advanceRef.current) {
       advanceRef.current = false;
       // Exercício concluído → intersticial (se a frequência permitir) ANTES de
@@ -483,7 +500,7 @@ function RunningSession({
           <Text style={styles.navBtnText}>{t('active.previous')}</Text>
         </Pressable>
         {isLastExercise ? (
-          <GradientButton label={t('active.finish')} onPress={finish} style={styles.navPrimary} />
+          <GradientButton label={t('active.finish')} onPress={requestFinish} style={styles.navPrimary} />
         ) : (
           <GradientButton label={t('active.next')} onPress={nextExercise} style={styles.navPrimary} />
         )}
@@ -504,6 +521,18 @@ function RunningSession({
         actions={[
           { label: t('active.quitLeave'), variant: 'primary', onPress: () => navigation.goBack() },
           { label: t('active.quitDiscard'), variant: 'danger', onPress: discardWorkout },
+        ]}
+      />
+
+      <ConfirmSheet
+        visible={finishConfirmOpen}
+        title={t('active.finishConfirmTitle')}
+        message={t('active.finishConfirmMessage', { count: pendingSets })}
+        cancelLabel={null}
+        onClose={() => setFinishConfirmOpen(false)}
+        actions={[
+          { label: t('active.finishConfirmYes'), variant: 'primary', onPress: finish },
+          { label: t('active.finishConfirmContinue'), onPress: continueWorkout },
         ]}
       />
     </SafeAreaView>

@@ -41,6 +41,10 @@ export function WorkoutsScreen() {
   const { workouts, sessions, deleteWorkout, duplicateWorkout, reorderWorkouts } = useWorkouts();
 
   const [typeSheet, setTypeSheet] = useState(false);
+  // Modo de edição da lista: só nele aparecem as alças para reordenar.
+  const [organizing, setOrganizing] = useState(false);
+  const canOrganize = workouts.length > 1;
+  const isOrganizing = organizing && canOrganize;
 
   // Treino cujo menu (⋮) está aberto; null = fechado.
   const [menuWorkout, setMenuWorkout] = useState<Workout | null>(null);
@@ -94,17 +98,19 @@ export function WorkoutsScreen() {
     return (
       <ScaleDecorator>
         <Pressable
-          onPress={() => navigation.navigate('Details', { workoutId: w.id })}
-          onLongPress={drag}
+          onPress={isOrganizing ? undefined : () => navigation.navigate('Details', { workoutId: w.id })}
+          onLongPress={isOrganizing ? drag : undefined}
           delayLongPress={200}
           disabled={isActive}
           style={({ pressed }) => [styles.card, (pressed || isActive) && styles.cardPressed]}
         >
           <View style={styles.cardRow}>
             <View style={styles.cardLeft}>
-              <Pressable hitSlop={10} onLongPress={drag} onPressIn={drag} style={styles.dragHandle}>
-                <Icon name="grip" size={18} color={colors.textMuted} />
-              </Pressable>
+              {isOrganizing ? (
+                <Pressable hitSlop={10} onLongPress={drag} onPressIn={drag} style={styles.dragHandle}>
+                  <Icon name="grip" size={18} color={colors.textMuted} />
+                </Pressable>
+              ) : null}
               <View style={[styles.badge, { backgroundColor: badge.tint }]}>
                 <Text style={[styles.badgeText, { color: badge.color }]}>
                   {workoutLetter(i)}
@@ -121,9 +127,11 @@ export function WorkoutsScreen() {
                 <Text style={styles.metaEx}>{t('workouts.exShort', { count: allExercises(w).length })}</Text>
                 <Text style={styles.metaMin}>{t('common.minutesShort', { min: estimatedDurationMin(w) })}</Text>
               </View>
-              <Pressable hitSlop={8} onPress={() => openMenu(w)}>
-                <Icon name="more" size={18} color={colors.textMuted} />
-              </Pressable>
+              {isOrganizing ? null : (
+                <Pressable hitSlop={8} onPress={() => openMenu(w)}>
+                  <Icon name="more" size={18} color={colors.textMuted} />
+                </Pressable>
+              )}
             </View>
           </View>
 
@@ -153,15 +161,39 @@ export function WorkoutsScreen() {
         keyExtractor={(w) => w.id}
         onDragEnd={({ data }) => reorderWorkouts(data)}
         renderItem={renderCard}
+        extraData={isOrganizing}
         containerStyle={{ flex: 1 }}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <View style={styles.header}>
-            <Text style={styles.title}>{t('workouts.title')}</Text>
+            <View style={styles.titleRow}>
+              <Text style={styles.title}>{t('workouts.title')}</Text>
+              {canOrganize ? (
+                <Pressable
+                  hitSlop={8}
+                  onPress={() => setOrganizing((v) => !v)}
+                  style={({ pressed }) => [
+                    styles.organizeBtn,
+                    isOrganizing && styles.organizeBtnActive,
+                    pressed && styles.optionPressed,
+                  ]}
+                >
+                  <Icon
+                    name={isOrganizing ? 'check' : 'grip'}
+                    size={14}
+                    color={isOrganizing ? colors.onAccent : colors.accent}
+                  />
+                  <Text style={[styles.organizeText, isOrganizing && styles.organizeTextActive]}>
+                    {isOrganizing ? t('workouts.organizeDone') : t('workouts.organize')}
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
             <Text style={styles.subtitle}>
-              {t('workouts.subtitle', { count: workouts.length })}
-              {workouts.length > 1 ? t('workouts.dragHint') : ''}
+              {isOrganizing
+                ? t('workouts.organizeHint')
+                : t('workouts.subtitle', { count: workouts.length })}
             </Text>
             <BannerAd />
           </View>
@@ -174,19 +206,21 @@ export function WorkoutsScreen() {
       />
 
       {/* FAB */}
-      <Pressable
-        onPress={() => setTypeSheet(true)}
-        style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
-      >
-        <LinearGradient
-          colors={gradients.accent}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.fabGradient}
+      {isOrganizing ? null : (
+        <Pressable
+          onPress={() => setTypeSheet(true)}
+          style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
         >
-          <Icon name="plus" size={26} color={colors.onAccent} />
-        </LinearGradient>
-      </Pressable>
+          <LinearGradient
+            colors={gradients.accent}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.fabGradient}
+          >
+            <Icon name="plus" size={26} color={colors.onAccent} />
+          </LinearGradient>
+        </Pressable>
+      )}
 
       {/* Seletor animado de tipo de treino */}
       <BottomSheet visible={typeSheet} onClose={() => setTypeSheet(false)}>
@@ -404,11 +438,41 @@ const makeStyles = (colors: ThemeColors) =>
     paddingTop: 24,
     paddingBottom: 16,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
   title: {
+    flexShrink: 1,
     color: colors.text,
     fontFamily: fonts.heading,
     fontSize: 32,
     letterSpacing: 0.5,
+  },
+  organizeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 10,
+    backgroundColor: colors.accentTint,
+    borderWidth: 1,
+    borderColor: colors.accentBorder,
+  },
+  organizeBtnActive: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
+  },
+  organizeText: {
+    color: colors.accent,
+    fontFamily: fonts.bodyBold,
+    fontSize: 12,
+  },
+  organizeTextActive: {
+    color: colors.onAccent,
   },
   subtitle: {
     color: colors.textSecondary,

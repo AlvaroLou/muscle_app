@@ -45,7 +45,14 @@ export function RestTimer({ seconds, trigger, upNextLabel, onDismiss }: Props) {
   };
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={skip}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={skip}
+      statusBarTranslucent
+      navigationBarTranslucent
+    >
       <View style={styles.backdrop}>
         <View style={styles.sheet}>
           <Text style={styles.label}>{t('rest.title')}</Text>

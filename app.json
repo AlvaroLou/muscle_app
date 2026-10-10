@@ -17,7 +17,7 @@
     ],
     "android": {
       "package": "com.workoutplanner.app",
-      "versionCode": 1,
+      "versionCode": 2,
       "softwareKeyboardLayoutMode": "pan",
       "adaptiveIcon": {
         "foregroundImage": "./assets/halteres.png",
@@ -37,7 +37,15 @@
           "userTrackingUsageDescription": "This identifier will be used to deliver personalized ads to you."
         }
       ],
-      "expo-video"
+      "expo-video",
+      [
+        "expo-navigation-bar",
+        {
+          "visibility": "hidden",
+          "behavior": "overlay-swipe"
+        }
+      ],
+      "./plugins/withReleaseSigning"
     ]
   }
 }
